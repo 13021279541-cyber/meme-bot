@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920">
+<title>🔥 热梗周报 - 第{{ week_number }}周</title>
+<style>
+  /* ===== 全局 ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
+  
+  body {
+    font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #f0f2f5;
+    color: #1a1a2e;
+  }
+
+  /* ===== 每一页 16:9 ===== */
+  .page {
+    width: 1920px;
+    height: 1080px;
+    position: relative;
+    overflow: hidden;
+    margin: 0 auto 40px;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+  }
+
+  /* ===== 封面页 ===== */
+  .cover {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: white;
+  }
+  
+  .cover .emoji-big {
+    font-size: 120px;
+    margin-bottom: 30px;
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+  }
+  
+  .cover h1 {
+    font-size: 80px;
+    font-weight: 900;
+    letter-spacing: 8px;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    margin-bottom: 20px;
+  }
+  
+  .cover .subtitle {
+    font-size: 30px;
+    font-weight: 500;
+    opacity: 0.75;
+    margin-bottom: 40px;
+    letter-spacing: 2px;
+  }
+  
+  /* 词云区域 */
+  .cover .word-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 16px 28px;
+    max-width: 1400px;
+    margin-top: 50px;
+    padding: 0 40px;
+  }
+
+  .cover .word-cloud .word {
+    display: inline-block;
+    font-weight: 600;
+    line-height: 1.2;
+    text-shadow: 0 1px 8px rgba(0,0,0,0.08);
+    transition: transform 0.3s;
+  }
+
+  /* 5 种大小等级 */
+  .cover .word-cloud .word.size-1 { font-size: 48px; }
+  .cover .word-cloud .word.size-2 { font-size: 40px; }
+  .cover .word-cloud .word.size-3 { font-size: 32px; }
+  .cover .word-cloud .word.size-4 { font-size: 26px; }
+  .cover .word-cloud .word.size-5 { font-size: 21px; }
+
+  /* 词云颜色——柔和半透明 */
+  .cover .word-cloud .word:nth-child(6n+1) { color: rgba(255, 255, 255, 0.65); }
+  .cover .word-cloud .word:nth-child(6n+2) { color: rgba(255, 225, 140, 0.6); }
+  .cover .word-cloud .word:nth-child(6n+3) { color: rgba(170, 230, 255, 0.6); }
+  .cover .word-cloud .word:nth-child(6n+4) { color: rgba(255, 195, 225, 0.6); }
+  .cover .word-cloud .word:nth-child(6n+5) { color: rgba(210, 245, 180, 0.6); }
+  .cover .word-cloud .word:nth-child(6n+6) { color: rgba(255, 210, 170, 0.6); }
+
+  .cover .team-badge {
+    margin-top: 36px;
+    font-size: 20px;
+    opacity: 0.6;
+    letter-spacing: 3px;
+  }
+
+  /* ===== 内容页 ===== */
+  .content-page {
+    background: linear-gradient(180deg, #fafbff 0%, #f0f4ff 100%);
+    padding: 48px 60px;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 36px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid #e8ecf4;
+    flex-shrink: 0;
+  }
+  
+  .page-header h2 {
+    font-size: 34px;
+    font-weight: 700;
+    color: #667eea;
+  }
+  
+  .page-number {
+    font-size: 20px;
+    color: #999;
+    font-weight: 500;
+  }
+
+  /* ===== 4列梗卡片网格 ===== */
+  .meme-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 28px;
+    flex: 1;
+    align-content: stretch;
+  }
+
+  /* 不足4个时居中 */
+  .meme-grid.cols-3 { grid-template-columns: repeat(3, 1fr); max-width: 1350px; margin: 0 auto; width: 100%; }
+  .meme-grid.cols-2 { grid-template-columns: repeat(2, 1fr); max-width: 900px; margin: 0 auto; width: 100%; }
+  .meme-grid.cols-1 { grid-template-columns: 1fr; max-width: 450px; margin: 0 auto; width: 100%; }
+
+  /* ===== 单张梗卡片（竖版布局） ===== */
+  .meme-card {
+    background: white;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.08);
+    border: 1px solid rgba(102, 126, 234, 0.1);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  /* 顶部彩色条 */
+  .meme-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    z-index: 1;
+  }
+  
+  .meme-card:nth-child(1)::before { background: linear-gradient(90deg, #667eea, #764ba2); }
+  .meme-card:nth-child(2)::before { background: linear-gradient(90deg, #f093fb, #f5576c); }
+  .meme-card:nth-child(3)::before { background: linear-gradient(90deg, #4facfe, #00f2fe); }
+  .meme-card:nth-child(4)::before { background: linear-gradient(90deg, #43e97b, #38f9d7); }
+
+  /* 卡片序号水印 */
+  .meme-card .card-number {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    font-size: 40px;
+    font-weight: 900;
+    color: rgba(102, 126, 234, 0.07);
+    line-height: 1;
+    z-index: 2;
+  }
+
+  /* 图片区域——竖版大面积，用 background-image 方式兼容 html2canvas */
+  .meme-card .meme-image-wrap {
+    width: 100%;
+    height: 520px;
+    overflow: hidden;
+    background-color: #f8f9fc;
+    flex-shrink: 0;
+    position: relative;
+    /* 默认：cover 取中间段（适合竖图和方图） */
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+  }
+
+  /* 横图 → contain 不裁切，上下留白居中 */
+  .meme-card .meme-image-wrap.img-landscape {
+    background-size: contain;
+  }
+
+  /* 无图时的占位 */
+  .meme-card .no-image {
+    width: 100%;
+    height: 520px;
+    background: linear-gradient(135deg, #f8f9fc 0%, #eef1f8 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 80px;
+    flex-shrink: 0;
+  }
+
+  /* 文字内容区 */
+  .meme-card .card-body {
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .meme-card .meme-name {
+    font-size: 24px;
+    font-weight: 800;
+    color: #1a1a2e;
+    margin-bottom: 10px;
+    line-height: 1.3;
+    /* 最多2行 */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .meme-card .meme-summary {
+    font-size: 15px;
+    color: #666;
+    line-height: 1.55;
+    flex: 1;
+    /* 最多4行 */
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .meme-card .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    margin-top: 10px;
+    border-top: 1px solid #f0f2f5;
+  }
+  
+  .meme-card .source-link {
+    font-size: 12px;
+    color: #667eea;
+    text-decoration: none;
+    padding: 4px 10px;
+    background: rgba(102, 126, 234, 0.08);
+    border-radius: 20px;
+  }
+  
+  .meme-card .date-tag {
+    font-size: 12px;
+    color: #bbb;
+  }
+
+  /* 王者相关小标注 */
+  .meme-card .category-badge {
+    position: absolute;
+    top: 12px;
+    left: 14px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    z-index: 3;
+    background: rgba(102, 126, 234, 0.9);
+    color: white;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+
+  /* ===== 打印 / 截图优化 ===== */
+  @media print {
+    body { background: none; }
+    .page {
+      margin: 0;
+      box-shadow: none;
+      page-break-after: always;
+      border-radius: 0;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== 封面页 ===== -->
+<div class="page cover">
+  <div class="emoji-big">🔥</div>
+  <h1>热梗洞察周报</h1>
+  <div class="subtitle">{{ date_range }}</div>
+  <div class="word-cloud">
+    {% for word in word_cloud_items %}
+    <span class="word size-{{ word.size }}">{{ word.name }}</span>
+    {% endfor %}
+  </div>
+  <div class="team-badge">by 用户社区组</div>
+</div>
+
+<!-- ===== 内容页 ===== -->
+{% for page in pages %}
+<div class="page content-page">
+  <div class="page-header">
+    <h2>🔥 本周热梗精选</h2>
+    <span class="page-number">{{ loop.index }} / {{ pages|length }}</span>
+  </div>
+  <div class="meme-grid cols-{{ page|length }}">
+    {% for meme in page %}
+    <div class="meme-card">
+      <span class="card-number">#{{ meme.global_index }}</span>
+      {% if meme.category == 'wangzhe' %}
+      <span class="category-badge">🎮 王者相关</span>
+      {% endif %}
+      {% if meme.image_path %}
+      <div class="meme-image-wrap" id="img-wrap-{{ meme.global_index }}" style="background-image:url('{{ meme.image_path }}')">
+        <!-- 隐藏 img 用于检测比例，加载后给 wrap 加 landscape 类 -->
+        <img style="display:none" src="{{ meme.image_path }}"
+             onload="var w=this.parentNode;if(this.naturalWidth/this.naturalHeight>1.2)w.classList.add('img-landscape')">
+      </div>
+      {% else %}
+      <div class="no-image">{{ meme.emoji }}</div>
+      {% endif %}
+      <div class="card-body">
+        <div class="meme-name">{{ meme.name }}</div>
+        <div class="meme-summary">{{ meme.summary }}</div>
+        <div class="card-footer">
+          {% if meme.source_url %}
+          <a class="source-link" href="{{ meme.source_url }}" target="_blank">🔗 来源</a>
+          {% endif %}
+          <span class="date-tag">{{ meme.date_display }}</span>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+
+
+
+</body>
+</html>

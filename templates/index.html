@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔥 热梗录入</title>
+<style>
+  /* ===== 基础 ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #f5f6fa;
+    color: #2d3436;
+    min-height: 100vh;
+  }
+
+  /* ===== 顶部导航 ===== */
+  .header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 24px 20px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+  }
+
+  .header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 2px;
+  }
+
+  .header p {
+    font-size: 13px;
+    opacity: 0.8;
+    margin-top: 4px;
+  }
+
+  /* ===== 主容器 ===== */
+  .container {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 20px 16px 40px;
+  }
+
+  /* ===== 标签切换 ===== */
+  .tabs {
+    display: flex;
+    background: white;
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 12px 0;
+    border: none;
+    background: transparent;
+    font-size: 15px;
+    font-weight: 600;
+    color: #999;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: all 0.25s;
+  }
+
+  .tab-btn.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ===== 表单卡片 ===== */
+  .form-card {
+    background: white;
+    border-radius: 16px;
+    padding: 28px 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 8px;
+  }
+
+  .form-group label .required {
+    color: #f5576c;
+    margin-left: 2px;
+  }
+
+  .form-group input[type="text"],
+  .form-group textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #eee;
+    border-radius: 10px;
+    font-size: 15px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+    outline: none;
+    background: #fafbfc;
+  }
+
+  .form-group input[type="text"]:focus,
+  .form-group textarea:focus {
+    border-color: #667eea;
+    background: white;
+  }
+
+  .form-group textarea {
+    resize: vertical;
+    min-height: 72px;
+  }
+
+  .form-group .hint {
+    font-size: 12px;
+    color: #aaa;
+    margin-top: 4px;
+  }
+
+  /* ===== 可搜索下拉选择器 ===== */
+  .searchable-select {
+    position: relative;
+  }
+
+  .searchable-select .select-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #eee;
+    border-radius: 10px;
+    font-size: 15px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+    outline: none;
+    background: #fafbfc;
+    cursor: text;
+  }
+
+  .searchable-select .select-input:focus {
+    border-color: #667eea;
+    background: white;
+  }
+
+  .select-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 2px solid #667eea;
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 50;
+    display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  }
+
+  .select-dropdown.show {
+    display: block;
+  }
+
+  .select-dropdown .select-option {
+    padding: 11px 16px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.15s;
+    color: #2d3436;
+  }
+
+  .select-dropdown .select-option:hover,
+  .select-dropdown .select-option.highlighted {
+    background: linear-gradient(135deg, rgba(102,126,234,0.08), rgba(118,75,162,0.08));
+    color: #667eea;
+  }
+
+  .select-dropdown .select-option .match-highlight {
+    font-weight: 700;
+    color: #764ba2;
+  }
+
+  .select-dropdown .no-match {
+    padding: 14px 16px;
+    font-size: 14px;
+    color: #bbb;
+    text-align: center;
+  }
+
+  /* ===== 图片上传区 ===== */
+  .upload-area {
+    border: 2px dashed #ddd;
+    border-radius: 12px;
+    padding: 32px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    background: #fafbfc;
+    position: relative;
+  }
+
+  .upload-area:hover {
+    border-color: #667eea;
+    background: #f5f3ff;
+  }
+
+  .upload-area.has-image {
+    padding: 8px;
+    border-style: solid;
+    border-color: #667eea;
+  }
+
+  .upload-area .upload-icon {
+    font-size: 40px;
+    margin-bottom: 8px;
+  }
+
+  .upload-area .upload-text {
+    font-size: 14px;
+    color: #999;
+  }
+
+  .upload-area .upload-text em {
+    color: #667eea;
+    font-style: normal;
+    font-weight: 600;
+  }
+
+  .upload-area input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .upload-preview {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    display: none;
+  }
+
+  .upload-area.has-image .upload-placeholder { display: none; }
+  .upload-area.has-image .upload-preview { display: block; margin: 0 auto; }
+
+  .clear-image {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.5);
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  .upload-area.has-image .clear-image { display: flex; }
+
+  /* ===== 提交按钮 ===== */
+  .submit-btn {
+    width: 100%;
+    padding: 14px 0;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    color: white;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    cursor: pointer;
+    transition: all 0.25s;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+    margin-top: 4px;
+  }
+
+  .submit-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  }
+
+  .submit-btn:active {
+    transform: translateY(0);
+  }
+
+  .submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* ===== Toast 提示 ===== */
+  .toast {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    color: white;
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .toast.success { background: #00b894; }
+  .toast.error { background: #f5576c; }
+
+  /* ===== 已录入列表 ===== */
+  .meme-list { list-style: none; }
+
+  .meme-item {
+    background: white;
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .meme-item .meme-thumb {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #f0f2f5;
+  }
+
+  .meme-item .meme-thumb-placeholder {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f0f2f5, #e8ecf4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+
+  .meme-item .meme-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .meme-item .meme-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: #2d3436;
+  }
+
+  .meme-item .meme-desc {
+    font-size: 13px;
+    color: #888;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .meme-item .meme-desc.empty {
+    color: #667eea;
+    cursor: pointer;
+    font-style: italic;
+    display: block;
+  }
+
+  .meme-item .meme-desc.empty:hover {
+    text-decoration: underline;
+  }
+
+  /* 行内编辑 */
+  .inline-edit {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 2px;
+  }
+
+  .inline-edit input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 2px solid #667eea;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    background: #fafbfc;
+  }
+
+  .inline-edit input:focus {
+    background: white;
+  }
+
+  .inline-edit button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .inline-edit .save-btn {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+  }
+
+  .inline-edit .cancel-btn {
+    background: #f0f2f5;
+    color: #666;
+  }
+
+  /* ===== 标签行 ===== */
+  .meme-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .tag-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 10px;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    background: white;
+    transition: all 0.2s;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .tag-btn:hover { transform: scale(1.05); }
+
+  /* 分类标签 */
+  .tag-btn.cat-wangzhe {
+    border-color: #667eea;
+    color: #667eea;
+    background: rgba(102,126,234,0.06);
+  }
+
+  .tag-btn.cat-public {
+    border-color: #f5576c;
+    color: #f5576c;
+    background: rgba(245,87,108,0.06);
+  }
+
+  .tag-btn.cat-none {
+    border-color: #ddd;
+    color: #aaa;
+  }
+
+  /* 等级色点 */
+  .priority-dots {
+    display: inline-flex;
+    gap: 5px;
+    align-items: center;
+    margin-left: 4px;
+  }
+
+  .priority-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .priority-dot:hover {
+    transform: scale(1.25);
+  }
+
+  .priority-dot.dot-red { background: #f5576c; }
+  .priority-dot.dot-orange { background: #ffa502; }
+  .priority-dot.dot-blue { background: #667eea; }
+  .priority-dot.dot-gray { background: #ccc; }
+
+  .priority-dot.active {
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.12);
+    transform: scale(1.2);
+  }
+
+  .priority-dot.active::after {
+    content: '✓';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  /* 录入分类选择 */
+  .category-toggle {
+    display: flex;
+    gap: 10px;
+  }
+  .cat-option {
+    flex: 1;
+    padding: 10px 0;
+    border: 2px solid #eee;
+    border-radius: 10px;
+    background: #fafbfc;
+    font-size: 14px;
+    font-weight: 600;
+    color: #999;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .cat-option:hover {
+    border-color: #ccc;
+    background: #f0f1f5;
+  }
+  .cat-option.selected[data-value="wangzhe"] {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea10, #764ba210);
+    color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+  }
+  .cat-option.selected[data-value="public"] {
+    border-color: #e17055;
+    background: linear-gradient(135deg, #e1705510, #d6336c10);
+    color: #e17055;
+    box-shadow: 0 2px 8px rgba(225, 112, 85, 0.15);
+  }
+
+  /* 周报缩略图 */
+  #report-thumb:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 28px rgba(0,0,0,0.18) !important;
+  }
+
+  .meme-item .meme-meta {
+    font-size: 11px;
+    color: #bbb;
+    margin-top: 6px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #ccc;
+  }
+
+  .empty-state .empty-icon {
+    font-size: 56px;
+    margin-bottom: 12px;
+  }
+
+  .empty-state p {
+    font-size: 15px;
+  }
+
+  /* ===== 加载状态 ===== */
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e0e0e0;
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🔥 热梗录入</h1>
+  <p>发现好梗？录下来！</p>
+</div>
+
+<div class="container">
+  <!-- 标签切换 -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="submit">📝 录入</button>
+    <button class="tab-btn" data-tab="list">📋 已录入 <span id="meme-count"></span></button>
+    <button class="tab-btn" data-tab="report">📊 生成周报</button>
+  </div>
+
+  <!-- 录入表单 -->
+  <div id="tab-submit" class="tab-panel active">
+    <div class="form-card">
+      <form id="meme-form" enctype="multipart/form-data">
+        <div class="form-group">
+          <label>梗名称 <span class="required">*</span></label>
+          <input type="text" name="name" id="input-name" placeholder="比如：城市不会眨眼" maxlength="50" required>
+        </div>
+
+        <div class="form-group">
+          <label>来源链接 <span class="required">*</span></label>
+          <input type="text" name="source_url" id="input-url" placeholder="抖音/微博/B站链接" required>
+        </div>
+
+        <div class="form-group">
+          <label>你的名字 <span class="required">*</span></label>
+          <div class="searchable-select" id="contributor-select">
+            <input type="text" class="select-input" id="input-contributor" name="contributor" placeholder="输入首字母快速筛选" autocomplete="off" required>
+            <div class="select-dropdown" id="contributor-dropdown"></div>
+          </div>
+          <div class="hint">下次会自动帮你填好</div>
+        </div>
+
+        <div class="form-group">
+          <label>分类 <span class="required">*</span></label>
+          <div class="category-toggle" id="category-toggle">
+            <button type="button" class="cat-option" data-value="wangzhe">🎮 王者相关</button>
+            <button type="button" class="cat-option" data-value="public">🔥 大众热点</button>
+          </div>
+          <input type="hidden" name="category" id="input-category" value="" required>
+        </div>
+
+        <div class="form-group">
+          <label>截图 <span class="required">*</span></label>
+          <div class="upload-area" id="upload-area">
+            <div class="upload-placeholder">
+              <div class="upload-icon">📸</div>
+              <div class="upload-text"><em>点击上传</em> 或拖拽图片到这里</div>
+            </div>
+            <img class="upload-preview" id="upload-preview" alt="预览">
+            <button type="button" class="clear-image" id="clear-image">✕</button>
+            <input type="file" name="image" id="input-image" accept="image/png,image/jpeg,image/gif,image/webp">
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submit-btn">🚀 提交热梗</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 已录入列表 -->
+  <div id="tab-list" class="tab-panel">
+    <div id="meme-list-container">
+      <div class="loading"><div class="spinner"></div><p style="margin-top:12px">加载中...</p></div>
+    </div>
+  </div>
+
+  <!-- 生成周报 -->
+  <div id="tab-report" class="tab-panel">
+    <div class="form-card">
+      <div style="margin-bottom:20px">
+        <label style="font-size:14px;font-weight:600;color:#555;display:block;margin-bottom:10px">📅 选择时间范围</label>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input type="date" id="report-start" style="flex:1;padding:10px 14px;border:2px solid #eee;border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:#fafbfc">
+          <span style="color:#999;font-weight:600">~</span>
+          <input type="date" id="report-end" style="flex:1;padding:10px 14px;border:2px solid #eee;border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:#fafbfc">
+        </div>
+        <div style="font-size:12px;color:#aaa;margin-top:6px">默认上周一到今天，可手动调整</div>
+      </div>
+
+      <div id="report-summary" style="background:#f8f9fc;border-radius:12px;padding:16px 18px;margin-bottom:18px;display:none">
+        <div style="font-size:13px;color:#888" id="report-summary-text"></div>
+      </div>
+
+      <button type="button" class="submit-btn" id="btn-preview-report" style="margin-bottom:10px">👀 预览周报</button>
+      <button type="button" class="submit-btn" id="btn-download-report" style="background:linear-gradient(135deg,#43e97b,#38f9d7);box-shadow:0 4px 16px rgba(67,233,123,0.3);display:none">📥 下载 HTML 周报</button>
+    </div>
+
+    <div id="report-preview-frame" style="margin-top:20px;display:none">
+      <div style="font-size:13px;color:#999;margin-bottom:8px;text-align:center">↓ 点击缩略图查看大图，右键/长按可保存</div>
+      <div style="display:flex;justify-content:center">
+        <img id="report-thumb" alt="周报预览" style="max-width:320px;max-height:400px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.12);cursor:pointer;transition:transform 0.2s;object-fit:contain">
+      </div>
+      <!-- 隐藏 iframe 用于截图 -->
+      <iframe id="report-iframe-hidden" style="position:fixed;left:-9999px;top:0;width:1920px;height:5000px;border:none;z-index:-1"></iframe>
+    </div>
+
+    <!-- 大图 lightbox -->
+    <div id="lightbox" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);cursor:zoom-out;overflow:auto;-webkit-overflow-scrolling:touch" onclick="closeLightbox()">
+      <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px">
+        <img id="lightbox-img" alt="周报大图" style="max-width:95vw;max-height:none;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.4)" onclick="event.stopPropagation()">
+      </div>
+      <div style="position:fixed;top:16px;right:20px;color:white;font-size:28px;cursor:pointer;opacity:0.7;z-index:10000" onclick="closeLightbox()">✕</div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== Lightbox 全局函数 =====
+function openLightbox(imgSrc) {
+  const lb = document.getElementById('lightbox');
+  const lbImg = document.getElementById('lightbox-img');
+  lbImg.src = imgSrc;
+  lb.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeLightbox();
+});
+</script>
+
+<script>
+(function() {
+  // ===== 标签切换 =====
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabPanels = document.querySelectorAll('.tab-panel');
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tab;
+      tabBtns.forEach(b => b.classList.remove('active'));
+      tabPanels.forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + target).classList.add('active');
+      if (target === 'list') loadMemes();
+      if (target === 'report') initReportDates();
+    });
+  });
+
+  // ===== Toast =====
+  function showToast(msg, type) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast ' + type + ' show';
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ===== 图片上传预览 =====
+  const uploadArea = document.getElementById('upload-area');
+  const inputImage = document.getElementById('input-image');
+  const uploadPreview = document.getElementById('upload-preview');
+  const clearBtn = document.getElementById('clear-image');
+
+  inputImage.addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('图片太大了，最大 10MB', 'error');
+      this.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      uploadPreview.src = e.target.result;
+      uploadArea.classList.add('has-image');
+    };
+    reader.readAsDataURL(file);
+  });
+
+  clearBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    inputImage.value = '';
+    uploadPreview.src = '';
+    uploadArea.classList.remove('has-image');
+  });
+
+  // 拖拽上传
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.style.borderColor = '#667eea'; });
+  uploadArea.addEventListener('dragleave', () => { uploadArea.style.borderColor = ''; });
+  uploadArea.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadArea.style.borderColor = '';
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      inputImage.files = dt.files;
+      inputImage.dispatchEvent(new Event('change'));
+    }
+  });
+
+  // ===== 可搜索下拉选择器 =====
+  const MEMBERS = [
+    'aggiezhang', 'chupychu', 'evayao', 'hazzelchen', 'infpzhang',
+    'qianaxu', 'roarchen', 'shyaoliu', 'wenjingyang', 'xintongzou',
+    'yoyopiao', 'zaynnchen', 'zialin', 'ziminmeng'
+  ];
+
+  const contributorInput = document.getElementById('input-contributor');
+  const dropdown = document.getElementById('contributor-dropdown');
+  let highlightIdx = -1;
+
+  function renderDropdown(filter) {
+    const query = (filter || '').toLowerCase();
+    const matched = query
+      ? MEMBERS.filter(m => m.toLowerCase().includes(query))
+      : MEMBERS;
+
+    if (matched.length === 0) {
+      dropdown.innerHTML = '<div class="no-match">没有匹配的成员</div>';
+      dropdown.classList.add('show');
+      highlightIdx = -1;
+      return;
+    }
+
+    dropdown.innerHTML = matched.map((name, i) => {
+      let display = name;
+      if (query) {
+        const idx = name.toLowerCase().indexOf(query);
+        display = name.slice(0, idx) +
+          '<span class="match-highlight">' + name.slice(idx, idx + query.length) + '</span>' +
+          name.slice(idx + query.length);
+      }
+      return '<div class="select-option" data-value="' + name + '" data-index="' + i + '">' + display + '</div>';
+    }).join('');
+
+    highlightIdx = -1;
+    dropdown.classList.add('show');
+  }
+
+  function selectOption(value) {
+    contributorInput.value = value;
+    dropdown.classList.remove('show');
+    localStorage.setItem('meme_contributor', value);
+  }
+
+  function updateHighlight() {
+    const options = dropdown.querySelectorAll('.select-option');
+    options.forEach((o, i) => {
+      o.classList.toggle('highlighted', i === highlightIdx);
+      if (i === highlightIdx) o.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  contributorInput.addEventListener('focus', () => {
+    renderDropdown(contributorInput.value);
+  });
+
+  contributorInput.addEventListener('input', () => {
+    renderDropdown(contributorInput.value);
+  });
+
+  contributorInput.addEventListener('keydown', (e) => {
+    const options = dropdown.querySelectorAll('.select-option');
+    if (!dropdown.classList.contains('show') || options.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      highlightIdx = (highlightIdx + 1) % options.length;
+      updateHighlight();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      highlightIdx = highlightIdx <= 0 ? options.length - 1 : highlightIdx - 1;
+      updateHighlight();
+    } else if (e.key === 'Enter' && highlightIdx >= 0) {
+      e.preventDefault();
+      selectOption(options[highlightIdx].dataset.value);
+    } else if (e.key === 'Escape') {
+      dropdown.classList.remove('show');
+    }
+  });
+
+  dropdown.addEventListener('click', (e) => {
+    const opt = e.target.closest('.select-option');
+    if (opt) selectOption(opt.dataset.value);
+  });
+
+  // 点击外部关闭下拉
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#contributor-select')) {
+      dropdown.classList.remove('show');
+    }
+  });
+
+  // 恢复保存的名字
+  const savedContributor = localStorage.getItem('meme_contributor');
+  if (savedContributor) contributorInput.value = savedContributor;
+
+  // ===== 分类选择按钮 =====
+  const catToggle = document.getElementById('category-toggle');
+  const catInput = document.getElementById('input-category');
+  catToggle.querySelectorAll('.cat-option').forEach(btn => {
+    btn.addEventListener('click', function() {
+      catToggle.querySelectorAll('.cat-option').forEach(b => b.classList.remove('selected'));
+      this.classList.add('selected');
+      catInput.value = this.dataset.value;
+    });
+  });
+
+  // ===== 提交表单 =====
+  const form = document.getElementById('meme-form');
+  const submitBtn = document.getElementById('submit-btn');
+
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    // 校验分类必选
+    if (!catInput.value) {
+      showToast('📌 请选择分类（王者相关 / 大众热点）', 'error');
+      return;
+    }
+
+    // 校验截图必传
+    const imageFile = document.getElementById('input-image').files[0];
+    if (!imageFile) {
+      showToast('📸 请上传截图', 'error');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ 提交中...';
+
+    try {
+      const formData = new FormData(form);
+      // 记住名字
+      const contributorName = formData.get('contributor');
+      localStorage.setItem('meme_contributor', contributorName);
+
+      const resp = await fetch('/api/meme', { method: 'POST', body: formData });
+      const data = await resp.json();
+
+      if (data.ok) {
+        showToast('✅ ' + data.message, 'success');
+        // 重置表单（保留名字）
+        const name = contributorInput.value;
+        form.reset();
+        contributorInput.value = contributorName;
+        uploadPreview.src = '';
+        uploadArea.classList.remove('has-image');
+        // 重置分类选择
+        catToggle.querySelectorAll('.cat-option').forEach(b => b.classList.remove('selected'));
+        catInput.value = '';
+        refreshCount();
+      } else {
+        showToast('❌ ' + (data.error || '提交失败'), 'error');
+      }
+    } catch (err) {
+      showToast('❌ 网络异常，请重试', 'error');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '🚀 提交热梗';
+    }
+  });
+
+  // ===== 加载已录入列表 =====
+  const EMOJIS = ['🔥','💀','😂','🤡','👀','💅','🐶','🌶️','⚡','🎭','🤯','😎'];
+
+  async function loadMemes() {
+    const container = document.getElementById('meme-list-container');
+    try {
+      const resp = await fetch('/api/memes');
+      const data = await resp.json();
+      const memes = data.memes || [];
+
+      if (memes.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">🫥</div><p>还没有热梗，快去录入第一个！</p></div>';
+        return;
+      }
+
+      let html = '<ul class="meme-list">';
+      memes.forEach(m => {
+        const date = new Date(m.created_at);
+        const dateStr = (date.getMonth()+1) + '/' + date.getDate() + ' ' + String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0');
+        const emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+        const hasSummary = m.summary && m.summary.trim();
+        const cat = m.category || '';
+        const pri = m.priority || '';
+
+        html += '<li class="meme-item" data-id="' + m.id + '">';
+        // 图片 URL：优先用 image_url（Supabase），否则拼本地路径
+        var imgSrc = m.image_url || (m.image_path ? (m.image_path.startsWith('http') ? m.image_path : '/' + m.image_path) : '');
+        if (imgSrc) {
+          html += '<img class="meme-thumb" src="' + imgSrc + '" alt="">';
+        } else {
+          html += '<div class="meme-thumb-placeholder">' + emoji + '</div>';
+        }
+        html += '<div class="meme-info">';
+        html += '<div class="meme-title">' + escapeHtml(m.name) + '</div>';
+        if (hasSummary) {
+          html += '<div class="meme-desc" data-id="' + m.id + '" title="点击修改概括">' + escapeHtml(m.summary) + '</div>';
+        } else {
+          html += '<div class="meme-desc empty" data-id="' + m.id + '">+ 点击补录概括</div>';
+        }
+
+        // 标签行：分类 + 等级
+        html += '<div class="meme-tags">';
+        // 分类按钮
+        if (cat === 'wangzhe') {
+          html += '<span class="tag-btn cat-wangzhe" data-id="' + m.id + '" data-field="category">🎮 王者相关</span>';
+        } else if (cat === 'public') {
+          html += '<span class="tag-btn cat-public" data-id="' + m.id + '" data-field="category">🔥 大众热点</span>';
+        } else {
+          html += '<span class="tag-btn cat-none" data-id="' + m.id + '" data-field="category">📌 点击分类</span>';
+        }
+
+        // 等级色点
+        html += '<div class="priority-dots" data-id="' + m.id + '">';
+        ['red','orange','blue','gray'].forEach(c => {
+          html += '<span class="priority-dot dot-' + c + (pri === c ? ' active' : '') + '" data-priority="' + c + '" title="' +
+            ({red:'🔴 必上',orange:'🟠 推荐',blue:'🔵 可选',gray:'⚪ 不上报'}[c]) + '"></span>';
+        });
+        html += '</div>';
+        html += '</div>';
+
+        html += '<div class="meme-meta">by ' + escapeHtml(m.contributor) + ' · ' + dateStr + '</div>';
+        html += '</div></li>';
+      });
+      html += '</ul>';
+      container.innerHTML = html;
+
+      // 绑定点击编辑事件
+      container.querySelectorAll('.meme-desc').forEach(el => {
+        el.addEventListener('click', function() {
+          startEditSummary(this);
+        });
+      });
+
+      // 绑定分类切换
+      container.querySelectorAll('.tag-btn[data-field="category"]').forEach(el => {
+        el.addEventListener('click', function() {
+          toggleCategory(this);
+        });
+      });
+
+      // 绑定等级点击
+      container.querySelectorAll('.priority-dot').forEach(el => {
+        el.addEventListener('click', function() {
+          setPriority(this);
+        });
+      });
+    } catch (err) {
+      container.innerHTML = '<div class="empty-state"><p>加载失败，请刷新重试</p></div>';
+    }
+  }
+
+  // ===== 分类切换 =====
+  async function toggleCategory(el) {
+    const memeId = el.dataset.id;
+    const currentCat = el.classList.contains('cat-wangzhe') ? 'wangzhe' :
+                       el.classList.contains('cat-public') ? 'public' : '';
+    // 循环：无 → 王者 → 大众 → 王者 ...
+    let newCat;
+    if (!currentCat) newCat = 'wangzhe';
+    else if (currentCat === 'wangzhe') newCat = 'public';
+    else newCat = 'wangzhe';
+
+    try {
+      const resp = await fetch('/api/meme/' + memeId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: newCat })
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        loadMemes();
+      } else {
+        showToast(data.error || '更新失败', 'error');
+      }
+    } catch (err) {
+      showToast('网络异常', 'error');
+    }
+  }
+
+  // ===== 等级设置 =====
+  async function setPriority(el) {
+    const memeId = el.closest('.priority-dots').dataset.id;
+    const newPri = el.dataset.priority;
+
+    try {
+      const resp = await fetch('/api/meme/' + memeId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priority: newPri })
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        loadMemes();
+      } else {
+        showToast(data.error || '更新失败', 'error');
+      }
+    } catch (err) {
+      showToast('网络异常', 'error');
+    }
+  }
+
+  // ===== 行内编辑补录概括 =====
+  function startEditSummary(el) {
+    const memeId = el.dataset.id;
+    const currentText = el.classList.contains('empty') ? '' : el.textContent;
+    const parent = el.parentElement;
+
+    // 替换为编辑框
+    const editDiv = document.createElement('div');
+    editDiv.className = 'inline-edit';
+    editDiv.innerHTML =
+      '<input type="text" placeholder="输入一句话概括" maxlength="200" value="' + escapeHtml(currentText) + '">' +
+      '<button class="save-btn" type="button">保存</button>' +
+      '<button class="cancel-btn" type="button">取消</button>';
+
+    el.style.display = 'none';
+    parent.insertBefore(editDiv, el.nextSibling);
+
+    const input = editDiv.querySelector('input');
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+
+    // 保存
+    async function doSave() {
+      const newSummary = input.value.trim();
+      if (!newSummary) {
+        showToast('概括不能为空', 'error');
+        return;
+      }
+      try {
+        const resp = await fetch('/api/meme/' + memeId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ summary: newSummary })
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          showToast('概括已更新', 'success');
+          loadMemes(); // 刷新列表
+        } else {
+          showToast(data.error || '更新失败', 'error');
+        }
+      } catch (err) {
+        showToast('网络异常', 'error');
+      }
+    }
+
+    // 取消
+    function doCancel() {
+      editDiv.remove();
+      el.style.display = '';
+    }
+
+    editDiv.querySelector('.save-btn').addEventListener('click', doSave);
+    editDiv.querySelector('.cancel-btn').addEventListener('click', doCancel);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doSave();
+      if (e.key === 'Escape') doCancel();
+    });
+  }
+
+  // ===== 周报生成 Tab =====
+  let reportDatesInited = false;
+  let lastReportUrl = '';
+
+  function initReportDates() {
+    if (reportDatesInited) return;
+    reportDatesInited = true;
+
+    const startInput = document.getElementById('report-start');
+    const endInput = document.getElementById('report-end');
+    const today = new Date();
+    // 上周一
+    const dayOfWeek = today.getDay();
+    const diffToLastMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const lastMon = new Date(today);
+    lastMon.setDate(today.getDate() - diffToLastMon - 7);
+
+    startInput.value = formatDateISO(lastMon);
+    endInput.value = formatDateISO(today);
+  }
+
+  function formatDateISO(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  // 预览
+  document.getElementById('btn-preview-report').addEventListener('click', async function() {
+    const startDate = document.getElementById('report-start').value;
+    const endDate = document.getElementById('report-end').value;
+    if (!startDate || !endDate) {
+      showToast('请选择日期范围', 'error');
+      return;
+    }
+
+    this.disabled = true;
+    this.textContent = '⏳ 生成中...';
+
+    try {
+      const resp = await fetch('/api/report/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_date: startDate, end_date: endDate })
+      });
+      const data = await resp.json();
+
+      if (data.ok) {
+        lastReportUrl = data.url;
+        // 显示摘要
+        const summaryDiv = document.getElementById('report-summary');
+        document.getElementById('report-summary-text').innerHTML =
+          '📊 范围 <b>' + startDate + '</b> ~ <b>' + endDate + '</b>　|　共 <b>' + data.total + '</b> 条热梗（已过滤灰色）';
+        summaryDiv.style.display = 'block';
+
+        // 显示预览区
+        document.getElementById('report-preview-frame').style.display = 'block';
+        const thumb = document.getElementById('report-thumb');
+        thumb.src = '';
+        thumb.alt = '⏳ 正在生成预览图...';
+        thumb.style.opacity = '0.5';
+
+        // fetch HTML 内容
+        const htmlResp = await fetch(data.url);
+        const htmlText = await htmlResp.text();
+
+        // 在隐藏 iframe 中加载 HTML + 截图脚本
+        const hiddenFrame = document.getElementById('report-iframe-hidden');
+
+        // 注入截图脚本：加载 html2canvas 后截取所有页面拼接成长图
+        const screenshotScript = `
+          <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"><\/script>
+          <script>
+            window.addEventListener('load', function() {
+              // 确保所有图片的比例检测已完成（隐藏 img 用于检测）
+              document.querySelectorAll('.meme-image-wrap img[style*="display:none"]').forEach(function(img) {
+                if (img.naturalWidth && img.naturalHeight) {
+                  if (img.naturalWidth / img.naturalHeight > 1.2) {
+                    img.parentNode.classList.add('img-landscape');
+                  }
+                }
+              });
+              setTimeout(async function() {
+                try {
+                  var pages = document.querySelectorAll('.page');
+                  if (!pages.length) pages = [document.body];
+
+                  var canvases = [];
+                  var totalHeight = 0;
+                  var maxWidth = 0;
+
+                  for (var i = 0; i < pages.length; i++) {
+                    var c = await html2canvas(pages[i], {
+                      scale: 1,
+                      useCORS: true, allowTaint: true,
+                      backgroundColor: '#ffffff', logging: false
+                    });
+                    canvases.push(c);
+                    totalHeight += c.height;
+                    if (c.width > maxWidth) maxWidth = c.width;
+                  }
+
+                  // 拼接
+                  var merged = document.createElement('canvas');
+                  merged.width = maxWidth;
+                  merged.height = totalHeight;
+                  var ctx = merged.getContext('2d');
+                  var y = 0;
+                  for (var j = 0; j < canvases.length; j++) {
+                    ctx.drawImage(canvases[j], 0, y);
+                    y += canvases[j].height;
+                  }
+
+                  parent.postMessage({ type: 'report-screenshot', data: merged.toDataURL('image/png') }, '*');
+                } catch (e) {
+                  parent.postMessage({ type: 'report-screenshot-error', error: e.message }, '*');
+                }
+              }, 1200);
+            });
+          <\/script>
+        `;
+
+        // 将截图脚本插入到 HTML 的 </body> 前，同时加 <base> 修复相对路径
+        let modifiedHtml = htmlText.replace('</body>', screenshotScript + '</body>');
+        // 加 base 标签让 ../images/ 这类相对路径正确解析
+        modifiedHtml = modifiedHtml.replace('<head>', '<head><base href="' + window.location.origin + '/output/">');
+        hiddenFrame.srcdoc = modifiedHtml;
+
+        // 监听截图结果
+        const messageHandler = function(event) {
+          if (event.data && event.data.type === 'report-screenshot') {
+            window.removeEventListener('message', messageHandler);
+            thumb.src = event.data.data;
+            thumb.alt = '周报预览 - 点击查看大图';
+            thumb.style.opacity = '1';
+            thumb.onclick = function() { openLightbox(event.data.data); };
+          } else if (event.data && event.data.type === 'report-screenshot-error') {
+            window.removeEventListener('message', messageHandler);
+            console.error('截图失败:', event.data.error);
+            thumb.alt = '预览生成失败，请直接下载 HTML';
+            thumb.style.opacity = '0.6';
+          }
+        };
+        window.addEventListener('message', messageHandler);
+
+        // 超时兜底（多页截图需要更长时间）
+        setTimeout(function() {
+          window.removeEventListener('message', messageHandler);
+          if (!thumb.src) {
+            thumb.alt = '预览超时，请直接下载 HTML';
+            thumb.style.opacity = '0.6';
+          }
+        }, 30000);
+
+        // 显示下载按钮
+        document.getElementById('btn-download-report').style.display = 'block';
+
+        showToast('✅ 周报已生成', 'success');
+      } else {
+        showToast('❌ ' + (data.error || '生成失败'), 'error');
+      }
+    } catch (err) {
+      showToast('❌ 网络异常', 'error');
+    } finally {
+      this.disabled = false;
+      this.textContent = '👀 预览周报';
+    }
+  });
+
+  // 下载
+  document.getElementById('btn-download-report').addEventListener('click', function() {
+    if (!lastReportUrl) return;
+    const a = document.createElement('a');
+    a.href = lastReportUrl;
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    showToast('📥 下载已开始', 'success');
+  });
+
+  async function refreshCount() {
+    try {
+      const resp = await fetch('/api/memes');
+      const data = await resp.json();
+      const span = document.getElementById('meme-count');
+      if (data.total > 0) span.textContent = '(' + data.total + ')';
+      else span.textContent = '';
+    } catch(e) {}
+  }
+
+  function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // 初始化
+  refreshCount();
+})();
+</script>
+</body>
+</html>
