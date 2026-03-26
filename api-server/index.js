@@ -6,7 +6,7 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 const path = require('path');
 
@@ -104,7 +104,7 @@ app.post('/memes', async (req, res) => {
     const { name, summary, source_url, category, priority, image_path } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
 
-    const id = uuidv4();
+    const id = crypto.randomUUID();
     const now = new Date();
     const weekNumber = getWeekNumber(now);
     const year = now.getFullYear();
