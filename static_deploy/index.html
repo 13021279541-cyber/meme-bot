@@ -1,0 +1,1691 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔥 热梗录入</title>
+<!-- Supabase JS SDK (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  /* ===== 基础 ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #f5f6fa;
+    color: #2d3436;
+    min-height: 100vh;
+  }
+
+  /* ===== 顶部导航 ===== */
+  .header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 24px 20px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+  }
+
+  .header h1 { font-size: 24px; font-weight: 700; letter-spacing: 2px; }
+  .header p { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+
+  /* ===== 主容器 ===== */
+  .container { max-width: 640px; margin: 0 auto; padding: 20px 16px 40px; }
+
+  /* ===== 标签切换 ===== */
+  .tabs {
+    display: flex;
+    background: white;
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 12px 0;
+    border: none;
+    background: transparent;
+    font-size: 15px;
+    font-weight: 600;
+    color: #999;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: all 0.25s;
+  }
+
+  .tab-btn.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ===== 表单卡片 ===== */
+  .form-card {
+    background: white;
+    border-radius: 16px;
+    padding: 28px 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  .form-group { margin-bottom: 20px; }
+
+  .form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 8px;
+  }
+
+  .form-group label .required { color: #f5576c; margin-left: 2px; }
+
+  .form-group input[type="text"],
+  .form-group textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #eee;
+    border-radius: 10px;
+    font-size: 15px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+    outline: none;
+    background: #fafbfc;
+  }
+
+  .form-group input[type="text"]:focus,
+  .form-group textarea:focus {
+    border-color: #667eea;
+    background: white;
+  }
+
+  .form-group textarea { resize: vertical; min-height: 72px; }
+  .form-group .hint { font-size: 12px; color: #aaa; margin-top: 4px; }
+
+  /* ===== 可搜索下拉选择器 ===== */
+  .searchable-select { position: relative; }
+
+  .searchable-select .select-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #eee;
+    border-radius: 10px;
+    font-size: 15px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+    outline: none;
+    background: #fafbfc;
+    cursor: text;
+  }
+
+  .searchable-select .select-input:focus { border-color: #667eea; background: white; }
+
+  .select-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 2px solid #667eea;
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 50;
+    display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  }
+
+  .select-dropdown.show { display: block; }
+
+  .select-dropdown .select-option {
+    padding: 11px 16px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.15s;
+    color: #2d3436;
+  }
+
+  .select-dropdown .select-option:hover,
+  .select-dropdown .select-option.highlighted {
+    background: linear-gradient(135deg, rgba(102,126,234,0.08), rgba(118,75,162,0.08));
+    color: #667eea;
+  }
+
+  .select-dropdown .select-option .match-highlight { font-weight: 700; color: #764ba2; }
+
+  .select-dropdown .no-match {
+    padding: 14px 16px;
+    font-size: 14px;
+    color: #bbb;
+    text-align: center;
+  }
+
+  /* ===== 图片上传区 ===== */
+  .upload-area {
+    border: 2px dashed #ddd;
+    border-radius: 12px;
+    padding: 32px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    background: #fafbfc;
+    position: relative;
+  }
+
+  .upload-area:hover { border-color: #667eea; background: #f5f3ff; }
+
+  .upload-area.has-image { padding: 8px; border-style: solid; border-color: #667eea; }
+
+  .upload-area .upload-icon { font-size: 40px; margin-bottom: 8px; }
+  .upload-area .upload-text { font-size: 14px; color: #999; }
+  .upload-area .upload-text em { color: #667eea; font-style: normal; font-weight: 600; }
+
+  .upload-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+  .upload-preview { max-width: 100%; max-height: 300px; border-radius: 8px; display: none; }
+
+  .upload-area.has-image .upload-placeholder { display: none; }
+  .upload-area.has-image .upload-preview { display: block; margin: 0 auto; }
+
+  .clear-image {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.5);
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  .upload-area.has-image .clear-image { display: flex; }
+
+  /* ===== 提交按钮 ===== */
+  .submit-btn {
+    width: 100%;
+    padding: 14px 0;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    color: white;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    cursor: pointer;
+    transition: all 0.25s;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+    margin-top: 4px;
+  }
+
+  .submit-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4); }
+  .submit-btn:active { transform: translateY(0); }
+  .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+  /* ===== Toast 提示 ===== */
+  .toast {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    color: white;
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  }
+
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { background: #00b894; }
+  .toast.error { background: #f5576c; }
+
+  /* ===== 已录入列表 ===== */
+  .meme-list { list-style: none; }
+
+  .meme-item {
+    background: white;
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .meme-item .meme-thumb {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #f0f2f5;
+  }
+
+  .meme-item .meme-thumb-placeholder {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f0f2f5, #e8ecf4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+
+  /* 图片可点击替换 */
+  .thumb-wrapper {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .thumb-wrapper .meme-thumb,
+  .thumb-wrapper .meme-thumb-placeholder {
+    width: 100%;
+    height: 100%;
+  }
+  .thumb-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    border-radius: 10px;
+    color: white;
+    font-size: 20px;
+  }
+  .thumb-wrapper:hover .thumb-overlay { opacity: 1; }
+
+  .meme-item .meme-info { flex: 1; min-width: 0; }
+  .meme-item .meme-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: #2d3436; }
+
+  .meme-item .meme-desc {
+    font-size: 13px;
+    color: #888;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .meme-item .meme-desc.empty { color: #667eea; cursor: pointer; font-style: italic; display: block; }
+  .meme-item .meme-desc.empty:hover { text-decoration: underline; }
+
+  .inline-edit { display: flex; gap: 6px; align-items: center; margin-top: 2px; }
+
+  .inline-edit input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 2px solid #667eea;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    background: #fafbfc;
+  }
+
+  .inline-edit input:focus { background: white; }
+
+  .inline-edit button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .inline-edit .save-btn { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+  .inline-edit .cancel-btn { background: #f0f2f5; color: #666; }
+
+  /* ===== 标签行 ===== */
+  .meme-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+
+  .tag-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 10px;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    background: white;
+    transition: all 0.2s;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .tag-btn:hover { transform: scale(1.05); }
+
+  .tag-btn.cat-wangzhe { border-color: #667eea; color: #667eea; background: rgba(102,126,234,0.06); }
+  .tag-btn.cat-public { border-color: #f5576c; color: #f5576c; background: rgba(245,87,108,0.06); }
+  .tag-btn.cat-none { border-color: #ddd; color: #aaa; }
+
+  .priority-dots { display: inline-flex; gap: 5px; align-items: center; margin-left: 4px; }
+
+  .priority-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .priority-dot:hover { transform: scale(1.25); }
+
+  .priority-dot.dot-red { background: #f5576c; }
+  .priority-dot.dot-orange { background: #ffa502; }
+  .priority-dot.dot-blue { background: #667eea; }
+  .priority-dot.dot-gray { background: #ccc; }
+
+  .priority-dot.active { box-shadow: 0 0 0 3px rgba(0,0,0,0.12); transform: scale(1.2); }
+
+  .priority-dot.active::after {
+    content: '✓';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  /* 录入分类选择 */
+  .category-toggle { display: flex; gap: 10px; }
+  .cat-option {
+    flex: 1;
+    padding: 10px 0;
+    border: 2px solid #eee;
+    border-radius: 10px;
+    background: #fafbfc;
+    font-size: 14px;
+    font-weight: 600;
+    color: #999;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .cat-option:hover { border-color: #ccc; background: #f0f1f5; }
+  .cat-option.selected[data-value="wangzhe"] {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #667eea10, #764ba210);
+    color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+  }
+  .cat-option.selected[data-value="public"] {
+    border-color: #e17055;
+    background: linear-gradient(135deg, #e1705510, #d6336c10);
+    color: #e17055;
+    box-shadow: 0 2px 8px rgba(225, 112, 85, 0.15);
+  }
+
+  .meme-item .meme-meta { font-size: 11px; color: #bbb; margin-top: 6px; }
+
+  /* ===== 删除按钮 ===== */
+  .delete-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #ccc;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 2px;
+  }
+  .delete-btn:hover { background: #fff0f0; color: #f5576c; }
+
+  /* 恢复按钮 */
+  .restore-btn {
+    padding: 4px 12px;
+    border: 1.5px solid #43e97b;
+    border-radius: 20px;
+    background: rgba(67,233,123,0.08);
+    color: #2ecc71;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 2px;
+  }
+  .restore-btn:hover { background: #43e97b; color: white; }
+
+  /* 永久删除按钮 */
+  .perma-delete-btn {
+    padding: 4px 12px;
+    border: 1.5px solid #f5576c;
+    border-radius: 20px;
+    background: rgba(245,87,108,0.06);
+    color: #f5576c;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 2px;
+    margin-left: 6px;
+  }
+  .perma-delete-btn:hover { background: #f5576c; color: white; }
+
+  .deleted-info { font-size: 11px; color: #f5576c; margin-top: 4px; }
+  .expire-warn { color: #ffa502; }
+
+  /* 确认弹窗 */
+  .confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .confirm-overlay.show { opacity: 1; pointer-events: all; }
+  .confirm-dialog {
+    background: white;
+    border-radius: 16px;
+    padding: 28px 24px;
+    max-width: 340px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+  .confirm-dialog .confirm-icon { font-size: 48px; margin-bottom: 12px; }
+  .confirm-dialog .confirm-title { font-size: 17px; font-weight: 700; color: #2d3436; margin-bottom: 8px; }
+  .confirm-dialog .confirm-desc { font-size: 13px; color: #888; margin-bottom: 20px; line-height: 1.5; }
+  .confirm-dialog .confirm-actions { display: flex; gap: 10px; }
+  .confirm-dialog .confirm-actions button {
+    flex: 1;
+    padding: 10px 0;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .confirm-dialog .btn-cancel { background: #f0f2f5; color: #666; }
+  .confirm-dialog .btn-cancel:hover { background: #e0e3e8; }
+  .confirm-dialog .btn-danger { background: #f5576c; color: white; }
+  .confirm-dialog .btn-danger:hover { background: #e0384e; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: #ccc; }
+  .empty-state .empty-icon { font-size: 56px; margin-bottom: 12px; }
+  .empty-state p { font-size: 15px; }
+
+  .loading { text-align: center; padding: 40px; color: #999; }
+
+  .spinner {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e0e0e0;
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 周报缩略图 */
+  #report-thumb:hover { transform: scale(1.02); box-shadow: 0 6px 28px rgba(0,0,0,0.18) !important; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🔥 热梗录入</h1>
+  <p>发现好梗？录下来！</p>
+</div>
+
+<div class="container">
+  <!-- 标签切换 -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="submit">📝 录入</button>
+    <button class="tab-btn" data-tab="list">📋 已录入 <span id="meme-count"></span></button>
+    <button class="tab-btn" data-tab="trash">🗑️ 回收站 <span id="trash-count"></span></button>
+    <button class="tab-btn" data-tab="report">📊 周报</button>
+  </div>
+
+  <!-- 录入表单 -->
+  <div id="tab-submit" class="tab-panel active">
+    <div class="form-card">
+      <form id="meme-form">
+        <div class="form-group">
+          <label>梗名称 <span class="required">*</span></label>
+          <input type="text" name="name" id="input-name" placeholder="比如：城市不会眨眼" maxlength="50" required>
+        </div>
+
+        <div class="form-group">
+          <label>来源链接 <span class="required">*</span></label>
+          <input type="text" name="source_url" id="input-url" placeholder="抖音/微博/B站链接" required>
+        </div>
+
+        <div class="form-group">
+          <label>你的名字 <span class="required">*</span></label>
+          <div class="searchable-select" id="contributor-select">
+            <input type="text" class="select-input" id="input-contributor" name="contributor" placeholder="输入首字母快速筛选" autocomplete="off" required>
+            <div class="select-dropdown" id="contributor-dropdown"></div>
+          </div>
+          <div class="hint">下次会自动帮你填好</div>
+        </div>
+
+        <div class="form-group">
+          <label>分类 <span class="required">*</span></label>
+          <div class="category-toggle" id="category-toggle">
+            <button type="button" class="cat-option" data-value="wangzhe">🎮 王者相关</button>
+            <button type="button" class="cat-option" data-value="public">🔥 大众热点</button>
+          </div>
+          <input type="hidden" name="category" id="input-category" value="">
+        </div>
+
+        <div class="form-group">
+          <label>截图 <span class="required">*</span></label>
+          <div class="upload-area" id="upload-area">
+            <div class="upload-placeholder">
+              <div class="upload-icon">📸</div>
+              <div class="upload-text"><em>点击上传</em> 或拖拽图片到这里</div>
+            </div>
+            <img class="upload-preview" id="upload-preview" alt="预览">
+            <button type="button" class="clear-image" id="clear-image">✕</button>
+            <input type="file" name="image" id="input-image" accept="image/png,image/jpeg,image/gif,image/webp">
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submit-btn">🚀 提交热梗</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 已录入列表 -->
+  <div id="tab-list" class="tab-panel">
+    <div id="meme-list-container">
+      <div class="loading"><div class="spinner"></div><p style="margin-top:12px">加载中...</p></div>
+    </div>
+  </div>
+
+  <!-- 回收站 -->
+  <div id="tab-trash" class="tab-panel">
+    <div style="background:white;border-radius:12px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);display:flex;align-items:center;gap:8px">
+      <span style="font-size:13px;color:#888">💡 删除后 <b>7 天内</b>可恢复，超过 7 天将自动清除</span>
+    </div>
+    <div id="trash-list-container">
+      <div class="loading"><div class="spinner"></div><p style="margin-top:12px">加载中...</p></div>
+    </div>
+  </div>
+
+  <!-- 生成周报 -->
+  <div id="tab-report" class="tab-panel">
+    <div class="form-card">
+      <div style="margin-bottom:20px">
+        <label style="font-size:14px;font-weight:600;color:#555;display:block;margin-bottom:10px">📅 选择时间范围</label>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input type="date" id="report-start" style="flex:1;padding:10px 14px;border:2px solid #eee;border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:#fafbfc">
+          <span style="color:#999;font-weight:600">~</span>
+          <input type="date" id="report-end" style="flex:1;padding:10px 14px;border:2px solid #eee;border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:#fafbfc">
+        </div>
+        <div style="font-size:12px;color:#aaa;margin-top:6px">默认上周一到今天，可手动调整</div>
+      </div>
+
+      <div id="report-summary" style="background:#f8f9fc;border-radius:12px;padding:16px 18px;margin-bottom:18px;display:none">
+        <div style="font-size:13px;color:#888" id="report-summary-text"></div>
+      </div>
+
+      <button type="button" class="submit-btn" id="btn-preview-report" style="margin-bottom:10px">👀 预览周报</button>
+      <button type="button" class="submit-btn" id="btn-download-report" style="background:linear-gradient(135deg,#43e97b,#38f9d7);box-shadow:0 4px 16px rgba(67,233,123,0.3);display:none">📥 下载 HTML 周报</button>
+    </div>
+
+    <div id="report-preview-frame" style="margin-top:20px;display:none">
+      <div style="font-size:13px;color:#999;margin-bottom:8px;text-align:center">↓ 点击缩略图查看大图</div>
+      <div style="display:flex;justify-content:center">
+        <img id="report-thumb" alt="周报预览" style="max-width:320px;max-height:400px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.12);cursor:pointer;transition:transform 0.2s;object-fit:contain">
+      </div>
+      <iframe id="report-iframe-hidden" style="position:fixed;left:-9999px;top:0;width:1920px;height:5000px;border:none;z-index:-1"></iframe>
+    </div>
+
+    <!-- 大图 lightbox -->
+    <div id="lightbox" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);cursor:zoom-out;overflow:auto;-webkit-overflow-scrolling:touch" onclick="closeLightbox()">
+      <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px">
+        <img id="lightbox-img" alt="周报大图" style="max-width:95vw;max-height:none;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.4)" onclick="event.stopPropagation()">
+      </div>
+      <div style="position:fixed;top:16px;right:20px;color:white;font-size:28px;cursor:pointer;opacity:0.7;z-index:10000" onclick="closeLightbox()">✕</div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- 确认弹窗 -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-dialog">
+    <div class="confirm-icon" id="confirm-icon">🗑️</div>
+    <div class="confirm-title" id="confirm-title">确认删除？</div>
+    <div class="confirm-desc" id="confirm-desc">删除后可在回收站找回（7天内）</div>
+    <div class="confirm-actions">
+      <button class="btn-cancel" id="confirm-cancel">取消</button>
+      <button class="btn-danger" id="confirm-ok">删除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== Supabase 初始化 =====
+const SUPABASE_URL = 'https://iwmvtizwcibusjjiquwq.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3bXZ0aXp3Y2lidXNqamlxdXdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MjMxMDUsImV4cCI6MjA4OTk5OTEwNX0.E6dx_ewnrFXgnoMoWsu0Hk27RbByf3w8ztmb6C9XIOM';
+const STORAGE_BUCKET = 'meme-images';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 企微 Webhook URL（配置后取消注释）
+const WEBHOOK_URL = '';
+
+// ===== Lightbox =====
+function openLightbox(imgSrc) {
+  document.getElementById('lightbox-img').src = imgSrc;
+  document.getElementById('lightbox').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+</script>
+
+<script>
+(function() {
+  // ===== 标签切换 =====
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const tabPanels = document.querySelectorAll('.tab-panel');
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tab;
+      tabBtns.forEach(b => b.classList.remove('active'));
+      tabPanels.forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + target).classList.add('active');
+      if (target === 'list') loadMemes();
+      if (target === 'trash') loadTrash();
+      if (target === 'report') initReportDates();
+    });
+  });
+
+  // ===== Toast =====
+  function showToast(msg, type) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast ' + type + ' show';
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ===== 图片上传预览 =====
+  const uploadArea = document.getElementById('upload-area');
+  const inputImage = document.getElementById('input-image');
+  const uploadPreview = document.getElementById('upload-preview');
+  const clearBtn = document.getElementById('clear-image');
+
+  inputImage.addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('图片太大了，最大 10MB', 'error');
+      this.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      uploadPreview.src = e.target.result;
+      uploadArea.classList.add('has-image');
+    };
+    reader.readAsDataURL(file);
+  });
+
+  clearBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    inputImage.value = '';
+    uploadPreview.src = '';
+    uploadArea.classList.remove('has-image');
+  });
+
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.style.borderColor = '#667eea'; });
+  uploadArea.addEventListener('dragleave', () => { uploadArea.style.borderColor = ''; });
+  uploadArea.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadArea.style.borderColor = '';
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      inputImage.files = dt.files;
+      inputImage.dispatchEvent(new Event('change'));
+    }
+  });
+
+  // ===== 可搜索下拉选择器 =====
+  const MEMBERS = [
+    'aggiezhang', 'chupychu', 'evayao', 'hazzelchen', 'infpzhang',
+    'qianaxu', 'roarchen', 'shyaoliu', 'wenjingyang', 'xintongzou',
+    'yoyopiao', 'zaynnchen', 'zialin', 'ziminmeng'
+  ];
+
+  const contributorInput = document.getElementById('input-contributor');
+  const dropdown = document.getElementById('contributor-dropdown');
+  let highlightIdx = -1;
+
+  function renderDropdown(filter) {
+    const query = (filter || '').toLowerCase();
+    const matched = query ? MEMBERS.filter(m => m.toLowerCase().includes(query)) : MEMBERS;
+
+    if (matched.length === 0) {
+      dropdown.innerHTML = '<div class="no-match">没有匹配的成员</div>';
+      dropdown.classList.add('show');
+      highlightIdx = -1;
+      return;
+    }
+
+    dropdown.innerHTML = matched.map((name, i) => {
+      let display = name;
+      if (query) {
+        const idx = name.toLowerCase().indexOf(query);
+        display = name.slice(0, idx) + '<span class="match-highlight">' + name.slice(idx, idx + query.length) + '</span>' + name.slice(idx + query.length);
+      }
+      return '<div class="select-option" data-value="' + name + '" data-index="' + i + '">' + display + '</div>';
+    }).join('');
+
+    highlightIdx = -1;
+    dropdown.classList.add('show');
+  }
+
+  function selectOption(value) {
+    contributorInput.value = value;
+    dropdown.classList.remove('show');
+    localStorage.setItem('meme_contributor', value);
+  }
+
+  function updateHighlight() {
+    const options = dropdown.querySelectorAll('.select-option');
+    options.forEach((o, i) => {
+      o.classList.toggle('highlighted', i === highlightIdx);
+      if (i === highlightIdx) o.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  contributorInput.addEventListener('focus', () => renderDropdown(contributorInput.value));
+  contributorInput.addEventListener('input', () => renderDropdown(contributorInput.value));
+
+  contributorInput.addEventListener('keydown', (e) => {
+    const options = dropdown.querySelectorAll('.select-option');
+    if (!dropdown.classList.contains('show') || options.length === 0) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); highlightIdx = (highlightIdx + 1) % options.length; updateHighlight(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); highlightIdx = highlightIdx <= 0 ? options.length - 1 : highlightIdx - 1; updateHighlight(); }
+    else if (e.key === 'Enter' && highlightIdx >= 0) { e.preventDefault(); selectOption(options[highlightIdx].dataset.value); }
+    else if (e.key === 'Escape') { dropdown.classList.remove('show'); }
+  });
+
+  dropdown.addEventListener('click', (e) => {
+    const opt = e.target.closest('.select-option');
+    if (opt) selectOption(opt.dataset.value);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#contributor-select')) dropdown.classList.remove('show');
+  });
+
+  const savedContributor = localStorage.getItem('meme_contributor');
+  if (savedContributor) contributorInput.value = savedContributor;
+
+  // ===== 分类选择按钮 =====
+  const catToggle = document.getElementById('category-toggle');
+  const catInput = document.getElementById('input-category');
+  catToggle.querySelectorAll('.cat-option').forEach(btn => {
+    btn.addEventListener('click', function() {
+      catToggle.querySelectorAll('.cat-option').forEach(b => b.classList.remove('selected'));
+      this.classList.add('selected');
+      catInput.value = this.dataset.value;
+    });
+  });
+
+  // ===== Supabase 图片上传 =====
+  async function uploadImageToSupabase(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const uniqueName = Math.random().toString(36).substr(2, 12) + '.' + ext;
+    const path = 'uploads/' + uniqueName;
+
+    const { data, error } = await sb.storage.from(STORAGE_BUCKET).upload(path, file, {
+      contentType: file.type,
+      upsert: false
+    });
+
+    if (error) throw new Error('图片上传失败: ' + error.message);
+
+    const { data: urlData } = sb.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+    return urlData.publicUrl;
+  }
+
+  // ===== 企微 Webhook =====
+  async function sendWebhook(memeName, contributor) {
+    if (!WEBHOOK_URL) return;
+    try {
+      await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          msgtype: 'markdown',
+          markdown: {
+            content: '🔥 **新热梗录入 🖼️**\n> 梗名：**' + memeName + '**\n> 贡献者：' + contributor
+          }
+        })
+      });
+    } catch (e) { console.warn('Webhook 发送失败:', e); }
+  }
+
+  // ===== 提交表单 =====
+  const form = document.getElementById('meme-form');
+  const submitBtn = document.getElementById('submit-btn');
+
+  form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    if (!catInput.value) { showToast('📌 请选择分类（王者相关 / 大众热点）', 'error'); return; }
+
+    const imageFile = document.getElementById('input-image').files[0];
+    if (!imageFile) { showToast('📸 请上传截图', 'error'); return; }
+
+    const name = document.getElementById('input-name').value.trim();
+    const sourceUrl = document.getElementById('input-url').value.trim();
+    const contributor = contributorInput.value.trim();
+
+    if (!name) { showToast('请填写梗名称', 'error'); return; }
+    if (!sourceUrl) { showToast('请填写来源链接', 'error'); return; }
+    if (!contributor) { showToast('请选择你的名字', 'error'); return; }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ 提交中...';
+
+    try {
+      // 1. 上传图片到 Supabase Storage
+      const imageUrl = await uploadImageToSupabase(imageFile);
+
+      // 2. 插入记录到 Supabase
+      const now = new Date();
+      const isoWeek = getISOWeek(now);
+
+      const meme = {
+        id: Math.random().toString(36).substr(2, 8),
+        name: name,
+        summary: '',
+        source_url: sourceUrl,
+        contributor: contributor,
+        category: catInput.value,
+        priority: '',
+        image_path: imageUrl,
+        created_at: now.toISOString(),
+        week_number: isoWeek,
+        year: now.getFullYear(),
+      };
+
+      const { error } = await sb.from('memes').insert(meme);
+      if (error) throw new Error(error.message);
+
+      // 3. 记住名字
+      localStorage.setItem('meme_contributor', contributor);
+
+      // 4. Webhook 通知
+      sendWebhook(name, contributor);
+
+      showToast('✅ 已记录热梗：' + name, 'success');
+
+      // 重置表单
+      form.reset();
+      contributorInput.value = contributor;
+      uploadPreview.src = '';
+      uploadArea.classList.remove('has-image');
+      catToggle.querySelectorAll('.cat-option').forEach(b => b.classList.remove('selected'));
+      catInput.value = '';
+      refreshCount();
+    } catch (err) {
+      showToast('❌ ' + (err.message || '提交失败'), 'error');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '🚀 提交热梗';
+    }
+  });
+
+  function getISOWeek(d) {
+    const date = new Date(d.getTime());
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + 3 - ((date.getDay() + 6) % 7));
+    const week1 = new Date(date.getFullYear(), 0, 4);
+    return 1 + Math.round(((date - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+  }
+
+  // ===== 加载已录入列表 =====
+  const EMOJIS = ['🔥','💀','😂','🤡','👀','💅','🐶','🌶️','⚡','🎭','🤯','😎'];
+
+  async function loadMemes() {
+    const container = document.getElementById('meme-list-container');
+    try {
+      const { data: memes, error } = await sb.from('memes').select('*').is('deleted_at', null).order('created_at', { ascending: false });
+      if (error) throw error;
+
+      if (!memes || memes.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">🫥</div><p>还没有热梗，快去录入第一个！</p></div>';
+        return;
+      }
+
+      let html = '<ul class="meme-list">';
+      memes.forEach(m => {
+        const date = new Date(m.created_at);
+        const dateStr = (date.getMonth()+1) + '/' + date.getDate() + ' ' + String(date.getHours()).padStart(2,'0') + ':' + String(date.getMinutes()).padStart(2,'0');
+        const emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+        const hasSummary = m.summary && m.summary.trim();
+        const cat = m.category || '';
+        const pri = m.priority || '';
+
+        // 图片 URL
+        var imgSrc = m.image_path && m.image_path.startsWith('http') ? m.image_path : '';
+
+        html += '<li class="meme-item" data-id="' + m.id + '">';
+        // 可点击更换截图的图片区
+        html += '<div class="thumb-wrapper" data-id="' + m.id + '" title="点击更换截图">';
+        if (imgSrc) {
+          html += '<img class="meme-thumb" src="' + imgSrc + '" alt="">';
+        } else {
+          html += '<div class="meme-thumb-placeholder">' + emoji + '</div>';
+        }
+        html += '<div class="thumb-overlay">📷</div>';
+        html += '</div>';
+        html += '<div class="meme-info">';
+        html += '<div class="meme-title">' + escapeHtml(m.name) + '</div>';
+        if (hasSummary) {
+          html += '<div class="meme-desc" data-id="' + m.id + '" title="点击修改概括">' + escapeHtml(m.summary) + '</div>';
+        } else {
+          html += '<div class="meme-desc empty" data-id="' + m.id + '">+ 点击补录概括</div>';
+        }
+
+        html += '<div class="meme-tags">';
+        if (cat === 'wangzhe') {
+          html += '<span class="tag-btn cat-wangzhe" data-id="' + m.id + '" data-field="category">🎮 王者相关</span>';
+        } else if (cat === 'public') {
+          html += '<span class="tag-btn cat-public" data-id="' + m.id + '" data-field="category">🔥 大众热点</span>';
+        } else {
+          html += '<span class="tag-btn cat-none" data-id="' + m.id + '" data-field="category">📌 点击分类</span>';
+        }
+
+        html += '<div class="priority-dots" data-id="' + m.id + '">';
+        ['red','orange','blue','gray'].forEach(c => {
+          html += '<span class="priority-dot dot-' + c + (pri === c ? ' active' : '') + '" data-priority="' + c + '" title="' +
+            ({red:'🔴 必上',orange:'🟠 推荐',blue:'🔵 可选',gray:'⚪ 不上报'}[c]) + '"></span>';
+        });
+        html += '</div></div>';
+        html += '<div class="meme-meta">by ' + escapeHtml(m.contributor) + ' · ' + dateStr + '</div>';
+        html += '</div>';
+        // 删除按钮
+        html += '<button class="delete-btn" data-id="' + m.id + '" data-name="' + escapeHtml(m.name) + '" title="删除">🗑️</button>';
+        html += '</li>';
+      });
+      html += '</ul>';
+      container.innerHTML = html;
+
+      // 绑定事件
+      container.querySelectorAll('.meme-desc').forEach(el => { el.addEventListener('click', function() { startEditSummary(this); }); });
+      container.querySelectorAll('.tag-btn[data-field="category"]').forEach(el => { el.addEventListener('click', function() { toggleCategory(this); }); });
+      container.querySelectorAll('.priority-dot').forEach(el => { el.addEventListener('click', function() { setPriority(this); }); });
+      container.querySelectorAll('.delete-btn').forEach(el => { el.addEventListener('click', function() { confirmDeleteMeme(this.dataset.id, this.dataset.name); }); });
+      container.querySelectorAll('.thumb-wrapper').forEach(el => { el.addEventListener('click', function() { startChangeImage(this.dataset.id); }); });
+    } catch (err) {
+      container.innerHTML = '<div class="empty-state"><p>加载失败，请刷新重试</p></div>';
+    }
+  }
+
+  // ===== 分类切换 =====
+  async function toggleCategory(el) {
+    const memeId = el.dataset.id;
+    const currentCat = el.classList.contains('cat-wangzhe') ? 'wangzhe' :
+                       el.classList.contains('cat-public') ? 'public' : '';
+    let newCat = !currentCat ? 'wangzhe' : currentCat === 'wangzhe' ? 'public' : 'wangzhe';
+
+    try {
+      const { error } = await sb.from('memes').update({ category: newCat }).eq('id', memeId);
+      if (error) throw error;
+      loadMemes();
+    } catch (err) { showToast('更新失败', 'error'); }
+  }
+
+  // ===== 等级设置 =====
+  async function setPriority(el) {
+    const memeId = el.closest('.priority-dots').dataset.id;
+    const newPri = el.dataset.priority;
+
+    try {
+      const { error } = await sb.from('memes').update({ priority: newPri }).eq('id', memeId);
+      if (error) throw error;
+      loadMemes();
+    } catch (err) { showToast('更新失败', 'error'); }
+  }
+
+  // ===== 行内编辑补录概括 =====
+  function startEditSummary(el) {
+    const memeId = el.dataset.id;
+    const currentText = el.classList.contains('empty') ? '' : el.textContent;
+    const parent = el.parentElement;
+
+    const editDiv = document.createElement('div');
+    editDiv.className = 'inline-edit';
+    editDiv.innerHTML =
+      '<input type="text" placeholder="输入一句话概括" maxlength="200" value="' + escapeHtml(currentText) + '">' +
+      '<button class="save-btn" type="button">保存</button>' +
+      '<button class="cancel-btn" type="button">取消</button>';
+
+    el.style.display = 'none';
+    parent.insertBefore(editDiv, el.nextSibling);
+
+    const input = editDiv.querySelector('input');
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+
+    async function doSave() {
+      const newSummary = input.value.trim();
+      if (!newSummary) { showToast('概括不能为空', 'error'); return; }
+      try {
+        const { error } = await sb.from('memes').update({ summary: newSummary }).eq('id', memeId);
+        if (error) throw error;
+        showToast('概括已更新', 'success');
+        loadMemes();
+      } catch (err) { showToast('更新失败', 'error'); }
+    }
+
+    function doCancel() { editDiv.remove(); el.style.display = ''; }
+
+    editDiv.querySelector('.save-btn').addEventListener('click', doSave);
+    editDiv.querySelector('.cancel-btn').addEventListener('click', doCancel);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doSave();
+      if (e.key === 'Escape') doCancel();
+    });
+  }
+
+  // ===== 更换截图 =====
+  // 创建一个隐藏的 file input 复用
+  const _imgInput = document.createElement('input');
+  _imgInput.type = 'file';
+  _imgInput.accept = 'image/*';
+  _imgInput.style.display = 'none';
+  document.body.appendChild(_imgInput);
+  let _changeImageId = null;
+
+  function startChangeImage(memeId) {
+    _changeImageId = memeId;
+    _imgInput.value = '';
+    _imgInput.click();
+  }
+
+  _imgInput.addEventListener('change', async function() {
+    if (!this.files || !this.files[0] || !_changeImageId) return;
+    const file = this.files[0];
+    const memeId = _changeImageId;
+    _changeImageId = null;
+
+    // 找到对应的 wrapper 显示 loading
+    const wrapper = document.querySelector('.thumb-wrapper[data-id="' + memeId + '"]');
+    if (wrapper) {
+      const overlay = wrapper.querySelector('.thumb-overlay');
+      if (overlay) overlay.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:2px"></div>';
+      if (overlay) overlay.style.opacity = '1';
+    }
+
+    try {
+      // 上传到 Supabase Storage
+      const ext = file.name.split('.').pop() || 'png';
+      const filePath = 'meme_' + memeId + '_' + Date.now() + '.' + ext;
+      const { data: uploadData, error: uploadErr } = await sb.storage.from('meme-images').upload(filePath, file, { upsert: true });
+      if (uploadErr) throw uploadErr;
+
+      const { data: urlData } = sb.storage.from('meme-images').getPublicUrl(filePath);
+      const publicUrl = urlData.publicUrl;
+
+      // 更新数据库
+      const { error: updateErr } = await sb.from('memes').update({ image_path: publicUrl }).eq('id', memeId);
+      if (updateErr) throw updateErr;
+
+      showToast('截图已更新', 'success');
+      loadMemes();
+    } catch (err) {
+      showToast('上传失败: ' + (err.message || ''), 'error');
+      // 恢复 overlay
+      if (wrapper) {
+        const overlay = wrapper.querySelector('.thumb-overlay');
+        if (overlay) { overlay.innerHTML = '📷'; overlay.style.opacity = ''; }
+      }
+    }
+  });
+
+  // ===== 确认弹窗逻辑 =====
+  let confirmCallback = null;
+
+  function showConfirm(options) {
+    document.getElementById('confirm-icon').textContent = options.icon || '🗑️';
+    document.getElementById('confirm-title').textContent = options.title || '确认操作？';
+    document.getElementById('confirm-desc').textContent = options.desc || '';
+    document.getElementById('confirm-ok').textContent = options.okText || '确认';
+    document.getElementById('confirm-ok').className = options.okClass || 'btn-danger';
+    confirmCallback = options.onConfirm;
+    document.getElementById('confirm-overlay').classList.add('show');
+  }
+
+  document.getElementById('confirm-cancel').addEventListener('click', function() {
+    document.getElementById('confirm-overlay').classList.remove('show');
+    confirmCallback = null;
+  });
+  document.getElementById('confirm-ok').addEventListener('click', function() {
+    document.getElementById('confirm-overlay').classList.remove('show');
+    if (confirmCallback) confirmCallback();
+    confirmCallback = null;
+  });
+  document.getElementById('confirm-overlay').addEventListener('click', function(e) {
+    if (e.target === this) {
+      this.classList.remove('show');
+      confirmCallback = null;
+    }
+  });
+
+  // ===== 软删除 =====
+  function confirmDeleteMeme(memeId, memeName) {
+    showConfirm({
+      icon: '🗑️',
+      title: '删除「' + memeName + '」？',
+      desc: '删除后可在回收站找回（7天内有效）',
+      okText: '删除',
+      okClass: 'btn-danger',
+      onConfirm: async function() {
+        try {
+          const { error } = await sb.from('memes').update({ deleted_at: new Date().toISOString() }).eq('id', memeId);
+          if (error) throw error;
+          showToast('已移入回收站', 'success');
+          loadMemes();
+          refreshCount();
+          refreshTrashCount();
+        } catch (err) {
+          showToast('删除失败: ' + (err.message || ''), 'error');
+        }
+      }
+    });
+  }
+
+  // ===== 加载回收站 =====
+  async function loadTrash() {
+    const container = document.getElementById('trash-list-container');
+    try {
+      const { data: memes, error } = await sb.from('memes').select('*').not('deleted_at', 'is', null).order('deleted_at', { ascending: false });
+      if (error) throw error;
+
+      if (!memes || memes.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">✨</div><p>回收站是空的，干干净净！</p></div>';
+        return;
+      }
+
+      const now = new Date();
+      let html = '<ul class="meme-list">';
+      memes.forEach(m => {
+        const emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+        var imgSrc = m.image_path && m.image_path.startsWith('http') ? m.image_path : '';
+        const deletedAt = new Date(m.deleted_at);
+        const daysLeft = Math.max(0, 7 - Math.floor((now - deletedAt) / (1000 * 60 * 60 * 24)));
+        const deletedDateStr = (deletedAt.getMonth()+1) + '/' + deletedAt.getDate() + ' ' + String(deletedAt.getHours()).padStart(2,'0') + ':' + String(deletedAt.getMinutes()).padStart(2,'0');
+
+        html += '<li class="meme-item" data-id="' + m.id + '">';
+        if (imgSrc) {
+          html += '<img class="meme-thumb" src="' + imgSrc + '" alt="" style="opacity:0.5">';
+        } else {
+          html += '<div class="meme-thumb-placeholder" style="opacity:0.5">' + emoji + '</div>';
+        }
+        html += '<div class="meme-info">';
+        html += '<div class="meme-title" style="opacity:0.6;text-decoration:line-through">' + escapeHtml(m.name) + '</div>';
+        if (m.summary) {
+          html += '<div class="meme-desc" style="opacity:0.5">' + escapeHtml(m.summary) + '</div>';
+        }
+        html += '<div class="deleted-info">';
+        html += '🗑️ 删除于 ' + deletedDateStr;
+        if (daysLeft > 0) {
+          html += ' · <span class="' + (daysLeft <= 2 ? 'expire-warn' : '') + '">还剩 ' + daysLeft + ' 天</span>';
+        } else {
+          html += ' · <span class="expire-warn">即将过期</span>';
+        }
+        html += '</div>';
+        html += '<div class="meme-meta">by ' + escapeHtml(m.contributor) + '</div>';
+        html += '</div>';
+        // 恢复 + 永久删除按钮
+        html += '<button class="restore-btn" data-id="' + m.id + '" title="恢复">↩ 恢复</button>';
+        html += '<button class="perma-delete-btn" data-id="' + m.id + '" data-name="' + escapeHtml(m.name) + '" title="永久删除">✕</button>';
+        html += '</li>';
+      });
+      html += '</ul>';
+      container.innerHTML = html;
+
+      // 绑定恢复事件
+      container.querySelectorAll('.restore-btn').forEach(el => {
+        el.addEventListener('click', function() { restoreMeme(this.dataset.id); });
+      });
+      container.querySelectorAll('.perma-delete-btn').forEach(el => {
+        el.addEventListener('click', function() { confirmPermaDelete(this.dataset.id, this.dataset.name); });
+      });
+    } catch (err) {
+      container.innerHTML = '<div class="empty-state"><p>加载失败，请刷新重试</p></div>';
+    }
+  }
+
+  // ===== 恢复 =====
+  async function restoreMeme(memeId) {
+    try {
+      const { error } = await sb.from('memes').update({ deleted_at: null }).eq('id', memeId);
+      if (error) throw error;
+      showToast('✅ 已恢复', 'success');
+      loadTrash();
+      refreshCount();
+      refreshTrashCount();
+    } catch (err) {
+      showToast('恢复失败', 'error');
+    }
+  }
+
+  // ===== 永久删除 =====
+  function confirmPermaDelete(memeId, memeName) {
+    showConfirm({
+      icon: '⚠️',
+      title: '永久删除「' + memeName + '」？',
+      desc: '此操作不可撤销，数据将彻底清除',
+      okText: '永久删除',
+      okClass: 'btn-danger',
+      onConfirm: async function() {
+        try {
+          const { error } = await sb.from('memes').delete().eq('id', memeId);
+          if (error) throw error;
+          showToast('已永久删除', 'success');
+          loadTrash();
+          refreshTrashCount();
+        } catch (err) {
+          showToast('删除失败: ' + (err.message || ''), 'error');
+        }
+      }
+    });
+  }
+
+  // ===== 回收站计数 =====
+  async function refreshTrashCount() {
+    try {
+      const { count, error } = await sb.from('memes').select('*', { count: 'exact', head: true }).not('deleted_at', 'is', null);
+      const span = document.getElementById('trash-count');
+      if (!error && count > 0) span.textContent = '(' + count + ')';
+      else span.textContent = '';
+    } catch(e) {}
+  }
+
+  // ===== 周报生成 =====
+  let reportDatesInited = false;
+  let lastReportHtml = '';
+
+  function initReportDates() {
+    if (reportDatesInited) return;
+    reportDatesInited = true;
+    const startInput = document.getElementById('report-start');
+    const endInput = document.getElementById('report-end');
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diffToLastMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const lastMon = new Date(today);
+    lastMon.setDate(today.getDate() - diffToLastMon - 7);
+    startInput.value = formatDateISO(lastMon);
+    endInput.value = formatDateISO(today);
+  }
+
+  function formatDateISO(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  // 生成周报 HTML（纯前端）
+  function generateReportHTML(memes, startDate, endDate) {
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const dateRange = s.getFullYear() + '年 ' + (s.getMonth()+1) + '月' + s.getDate() + '日 ~ ' + (e.getMonth()+1) + '月' + e.getDate() + '日';
+
+    // 词云
+    const PLACEHOLDER_EMOJIS = ['🔥','💀','😂','🤡','👀','💅','🐶','🌶️','⚡','🎭','🤯','😎'];
+    const wordCloudItems = memes.map((m, i) => {
+      const ratio = i / memes.length;
+      let size = ratio < 0.2 ? 1 : ratio < 0.4 ? 2 : ratio < 0.6 ? 3 : ratio < 0.8 ? 4 : 5;
+      return { name: m.name, size: size };
+    });
+    // shuffle
+    for (let i = wordCloudItems.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [wordCloudItems[i], wordCloudItems[j]] = [wordCloudItems[j], wordCloudItems[i]];
+    }
+
+    // 分页 4 per page
+    const pages = [];
+    for (let i = 0; i < memes.length; i += 4) {
+      pages.push(memes.slice(i, i + 4));
+    }
+
+    let html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920">
+<title>🔥 热梗周报</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
+  body { font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f0f2f5; color: #1a1a2e; }
+  .page { width: 1920px; height: 1080px; position: relative; overflow: hidden; margin: 0 auto 40px; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.1); }
+  .cover { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: white; }
+  .cover .emoji-big { font-size: 120px; margin-bottom: 30px; }
+  .cover h1 { font-size: 80px; font-weight: 900; letter-spacing: 8px; text-shadow: 0 4px 20px rgba(0,0,0,0.2); margin-bottom: 20px; }
+  .cover .subtitle { font-size: 30px; font-weight: 500; opacity: 0.75; margin-bottom: 40px; letter-spacing: 2px; }
+  .cover .word-cloud { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 16px 28px; max-width: 1400px; margin-top: 50px; padding: 0 40px; }
+  .cover .word-cloud .word { display: inline-block; font-weight: 600; line-height: 1.2; text-shadow: 0 1px 8px rgba(0,0,0,0.08); }
+  .cover .word-cloud .word.size-1 { font-size: 48px; }
+  .cover .word-cloud .word.size-2 { font-size: 40px; }
+  .cover .word-cloud .word.size-3 { font-size: 32px; }
+  .cover .word-cloud .word.size-4 { font-size: 26px; }
+  .cover .word-cloud .word.size-5 { font-size: 21px; }
+  .cover .word-cloud .word:nth-child(6n+1) { color: rgba(255,255,255,0.65); }
+  .cover .word-cloud .word:nth-child(6n+2) { color: rgba(255,225,140,0.6); }
+  .cover .word-cloud .word:nth-child(6n+3) { color: rgba(170,230,255,0.6); }
+  .cover .word-cloud .word:nth-child(6n+4) { color: rgba(255,195,225,0.6); }
+  .cover .word-cloud .word:nth-child(6n+5) { color: rgba(210,245,180,0.6); }
+  .cover .word-cloud .word:nth-child(6n+6) { color: rgba(255,210,170,0.6); }
+  .cover .team-badge { margin-top: 36px; font-size: 20px; opacity: 0.6; letter-spacing: 3px; }
+  .content-page { background: linear-gradient(180deg, #fafbff 0%, #f0f4ff 100%); padding: 48px 60px; display: flex; flex-direction: column; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; padding-bottom: 16px; border-bottom: 3px solid #e8ecf4; flex-shrink: 0; }
+  .page-header h2 { font-size: 34px; font-weight: 700; color: #667eea; }
+  .page-number { font-size: 20px; color: #999; font-weight: 500; }
+  .meme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; flex: 1; align-content: stretch; }
+  .meme-grid.cols-3 { grid-template-columns: repeat(3, 1fr); max-width: 1350px; margin: 0 auto; width: 100%; }
+  .meme-grid.cols-2 { grid-template-columns: repeat(2, 1fr); max-width: 900px; margin: 0 auto; width: 100%; }
+  .meme-grid.cols-1 { grid-template-columns: 1fr; max-width: 450px; margin: 0 auto; width: 100%; }
+  .meme-card { background: white; border-radius: 16px; display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(102,126,234,0.08); border: 1px solid rgba(102,126,234,0.1); position: relative; overflow: hidden; }
+  .meme-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; z-index: 1; }
+  .meme-card:nth-child(1)::before { background: linear-gradient(90deg, #667eea, #764ba2); }
+  .meme-card:nth-child(2)::before { background: linear-gradient(90deg, #f093fb, #f5576c); }
+  .meme-card:nth-child(3)::before { background: linear-gradient(90deg, #4facfe, #00f2fe); }
+  .meme-card:nth-child(4)::before { background: linear-gradient(90deg, #43e97b, #38f9d7); }
+  .meme-card .card-number { position: absolute; top: 14px; right: 16px; font-size: 40px; font-weight: 900; color: rgba(102,126,234,0.07); line-height: 1; z-index: 2; }
+  .meme-card .meme-image-wrap { width: 100%; height: 520px; overflow: hidden; background-color: #f8f9fc; flex-shrink: 0; position: relative; background-size: cover; background-position: center center; background-repeat: no-repeat; }
+  .meme-card .meme-image-wrap.img-landscape { background-size: contain; }
+  .meme-card .no-image { width: 100%; height: 520px; background: linear-gradient(135deg, #f8f9fc 0%, #eef1f8 100%); display: flex; align-items: center; justify-content: center; font-size: 80px; flex-shrink: 0; }
+  .meme-card .card-body { padding: 20px 22px; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .meme-card .meme-name { font-size: 24px; font-weight: 800; color: #1a1a2e; margin-bottom: 10px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .meme-card .meme-summary { font-size: 15px; color: #666; line-height: 1.55; flex: 1; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .meme-card .card-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; margin-top: 10px; border-top: 1px solid #f0f2f5; }
+  .meme-card .source-link { font-size: 12px; color: #667eea; text-decoration: none; padding: 4px 10px; background: rgba(102,126,234,0.08); border-radius: 20px; }
+  .meme-card .date-tag { font-size: 12px; color: #bbb; }
+  .meme-card .category-badge { position: absolute; top: 12px; left: 14px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; z-index: 3; background: rgba(102,126,234,0.9); color: white; backdrop-filter: blur(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  @media print { body { background: none; } .page { margin: 0; box-shadow: none; page-break-after: always; border-radius: 0; } }
+</style>
+</head>
+<body>
+<div class="page cover">
+  <div class="emoji-big">🔥</div>
+  <h1>热梗洞察周报</h1>
+  <div class="subtitle">${escapeHtml(dateRange)}</div>
+  <div class="word-cloud">`;
+
+    wordCloudItems.forEach(w => {
+      html += `<span class="word size-${w.size}">${escapeHtml(w.name)}</span>`;
+    });
+
+    html += `</div>
+  <div class="team-badge">by 用户社区组</div>
+</div>`;
+
+    pages.forEach((page, pageIdx) => {
+      html += `<div class="page content-page">
+  <div class="page-header">
+    <h2>🔥 本周热梗精选</h2>
+    <span class="page-number">${pageIdx + 1} / ${pages.length}</span>
+  </div>
+  <div class="meme-grid cols-${page.length}">`;
+
+      page.forEach((meme, cardIdx) => {
+        const globalIdx = pageIdx * 4 + cardIdx + 1;
+        const created = new Date(meme.created_at);
+        const dateDisplay = (created.getMonth()+1) + '/' + created.getDate();
+        const emoji = PLACEHOLDER_EMOJIS[Math.floor(Math.random() * PLACEHOLDER_EMOJIS.length)];
+        const imgSrc = meme.image_path && meme.image_path.startsWith('http') ? meme.image_path : '';
+
+        html += `<div class="meme-card">
+      <span class="card-number">#${globalIdx}</span>`;
+
+        if (meme.category === 'wangzhe') {
+          html += `<span class="category-badge">🎮 王者相关</span>`;
+        }
+
+        if (imgSrc) {
+          html += `<div class="meme-image-wrap" style="background-image:url('${imgSrc}')">
+        <img style="display:none" src="${imgSrc}" onload="var w=this.parentNode;if(this.naturalWidth/this.naturalHeight>1.2)w.classList.add('img-landscape')">
+      </div>`;
+        } else {
+          html += `<div class="no-image">${emoji}</div>`;
+        }
+
+        html += `<div class="card-body">
+        <div class="meme-name">${escapeHtml(meme.name)}</div>
+        <div class="meme-summary">${escapeHtml(meme.summary || '')}</div>
+        <div class="card-footer">`;
+
+        if (meme.source_url) {
+          html += `<a class="source-link" href="${escapeHtml(meme.source_url)}" target="_blank">🔗 来源</a>`;
+        }
+
+        html += `<span class="date-tag">${dateDisplay}</span>
+        </div>
+      </div>
+    </div>`;
+      });
+
+      html += `</div></div>`;
+    });
+
+    html += `</body></html>`;
+    return html;
+  }
+
+  // 预览
+  document.getElementById('btn-preview-report').addEventListener('click', async function() {
+    const startDate = document.getElementById('report-start').value;
+    const endDate = document.getElementById('report-end').value;
+    if (!startDate || !endDate) { showToast('请选择日期范围', 'error'); return; }
+
+    this.disabled = true;
+    this.textContent = '⏳ 生成中...';
+
+    try {
+      // 从 Supabase 查询
+      const startDt = startDate + 'T00:00:00';
+      const endDt = endDate + 'T23:59:59';
+      const { data: memes, error } = await sb.from('memes').select('*')
+        .is('deleted_at', null)
+        .gte('created_at', startDt)
+        .lte('created_at', endDt)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // 过滤灰色
+      const filtered = (memes || []).filter(m => m.priority !== 'gray');
+      if (filtered.length === 0) {
+        showToast('该时间范围内没有可上报的热梗', 'error');
+        return;
+      }
+
+      // 按等级排序
+      const priorityOrder = { red: 0, orange: 1, blue: 2, '': 3 };
+      filtered.sort((a, b) => (priorityOrder[a.priority || ''] || 3) - (priorityOrder[b.priority || ''] || 3));
+
+      // 生成 HTML
+      lastReportHtml = generateReportHTML(filtered, startDate, endDate);
+
+      // 显示摘要
+      document.getElementById('report-summary-text').innerHTML =
+        '📊 范围 <b>' + startDate + '</b> ~ <b>' + endDate + '</b>　|　共 <b>' + filtered.length + '</b> 条热梗（已过滤灰色）';
+      document.getElementById('report-summary').style.display = 'block';
+
+      // 预览
+      document.getElementById('report-preview-frame').style.display = 'block';
+      const thumb = document.getElementById('report-thumb');
+      thumb.src = '';
+      thumb.alt = '⏳ 正在生成预览图...';
+      thumb.style.opacity = '0.5';
+
+      const hiddenFrame = document.getElementById('report-iframe-hidden');
+      const screenshotScript = `<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"><\/script>
+<script>
+window.addEventListener('load', function() {
+  document.querySelectorAll('.meme-image-wrap img[style*="display:none"]').forEach(function(img) {
+    if (img.naturalWidth && img.naturalHeight) {
+      if (img.naturalWidth / img.naturalHeight > 1.2) img.parentNode.classList.add('img-landscape');
+    }
+  });
+  setTimeout(async function() {
+    try {
+      var pages = document.querySelectorAll('.page');
+      if (!pages.length) pages = [document.body];
+      var canvases = [], totalHeight = 0, maxWidth = 0;
+      for (var i = 0; i < pages.length; i++) {
+        var c = await html2canvas(pages[i], { scale: 1, useCORS: true, allowTaint: true, backgroundColor: '#ffffff', logging: false });
+        canvases.push(c); totalHeight += c.height;
+        if (c.width > maxWidth) maxWidth = c.width;
+      }
+      var merged = document.createElement('canvas');
+      merged.width = maxWidth; merged.height = totalHeight;
+      var ctx = merged.getContext('2d'); var y = 0;
+      for (var j = 0; j < canvases.length; j++) { ctx.drawImage(canvases[j], 0, y); y += canvases[j].height; }
+      parent.postMessage({ type: 'report-screenshot', data: merged.toDataURL('image/png') }, '*');
+    } catch (e) { parent.postMessage({ type: 'report-screenshot-error', error: e.message }, '*'); }
+  }, 1200);
+});
+<\/script>`;
+
+      let modifiedHtml = lastReportHtml.replace('</body>', screenshotScript + '</body>');
+      hiddenFrame.srcdoc = modifiedHtml;
+
+      const messageHandler = function(event) {
+        if (event.data && event.data.type === 'report-screenshot') {
+          window.removeEventListener('message', messageHandler);
+          thumb.src = event.data.data;
+          thumb.alt = '周报预览 - 点击查看大图';
+          thumb.style.opacity = '1';
+          thumb.onclick = function() { openLightbox(event.data.data); };
+        } else if (event.data && event.data.type === 'report-screenshot-error') {
+          window.removeEventListener('message', messageHandler);
+          thumb.alt = '预览生成失败，请直接下载 HTML';
+          thumb.style.opacity = '0.6';
+        }
+      };
+      window.addEventListener('message', messageHandler);
+      setTimeout(function() {
+        window.removeEventListener('message', messageHandler);
+        if (!thumb.src) { thumb.alt = '预览超时，请直接下载 HTML'; thumb.style.opacity = '0.6'; }
+      }, 30000);
+
+      document.getElementById('btn-download-report').style.display = 'block';
+      showToast('✅ 周报已生成', 'success');
+    } catch (err) {
+      showToast('❌ ' + (err.message || '生成失败'), 'error');
+    } finally {
+      this.disabled = false;
+      this.textContent = '👀 预览周报';
+    }
+  });
+
+  // 下载
+  document.getElementById('btn-download-report').addEventListener('click', function() {
+    if (!lastReportHtml) return;
+    const blob = new Blob([lastReportHtml], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const startDate = document.getElementById('report-start').value;
+    const endDate = document.getElementById('report-end').value;
+    a.download = '热梗周报_' + startDate + '_to_' + endDate + '.html';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast('📥 下载已开始', 'success');
+  });
+
+  async function refreshCount() {
+    try {
+      const { count, error } = await sb.from('memes').select('*', { count: 'exact', head: true }).is('deleted_at', null);
+      const span = document.getElementById('meme-count');
+      if (!error && count > 0) span.textContent = '(' + count + ')';
+      else span.textContent = '';
+    } catch(e) {}
+  }
+
+  function escapeHtml(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // 初始化
+  refreshCount();
+  refreshTrashCount();
+})();
+</script>
+</body>
+</html>

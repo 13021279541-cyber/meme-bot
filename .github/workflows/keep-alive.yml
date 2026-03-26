@@ -1,0 +1,53 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # 每 5 天执行一次（远小于 7 天休眠阈值，留安全余量）
+    # UTC 01:00 = 北京时间 09:00
+    - cron: '0 1 */5 * *'
+  workflow_dispatch: # 允许手动触发测试
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping Supabase to prevent hibernation
+        run: |
+          echo "🏓 Pinging Supabase to keep it alive..."
+          
+          SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+          SUPABASE_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          
+          # 方法1: 通过 REST API 查询 memes 表（产生数据库活动）
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${SUPABASE_URL}/rest/v1/memes?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}")
+          
+          echo "Database query response: HTTP ${HTTP_CODE}"
+          
+          # 方法2: 调用 Storage API（双重保险）
+          HTTP_CODE2=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${SUPABASE_URL}/storage/v1/bucket" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}")
+          
+          echo "Storage API response: HTTP ${HTTP_CODE2}"
+          
+          # 方法3: 调用 Auth API
+          HTTP_CODE3=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${SUPABASE_URL}/auth/v1/settings" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}")
+          
+          echo "Auth API response: HTTP ${HTTP_CODE3}"
+          
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+            echo "✅ Supabase is alive and responding!"
+          else
+            echo "⚠️ Supabase may be paused or unreachable (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+          
+          echo "🎉 Keep-alive ping completed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
