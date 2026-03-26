@@ -109,65 +109,6 @@
   .form-group textarea { resize: vertical; min-height: 72px; }
   .form-group .hint { font-size: 12px; color: #aaa; margin-top: 4px; }
 
-  /* ===== 可搜索下拉选择器 ===== */
-  .searchable-select { position: relative; }
-
-  .searchable-select .select-input {
-    width: 100%;
-    padding: 12px 16px;
-    border: 2px solid #eee;
-    border-radius: 10px;
-    font-size: 15px;
-    font-family: inherit;
-    transition: border-color 0.2s;
-    outline: none;
-    background: #fafbfc;
-    cursor: text;
-  }
-
-  .searchable-select .select-input:focus { border-color: #667eea; background: white; }
-
-  .select-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: white;
-    border: 2px solid #667eea;
-    border-top: none;
-    border-radius: 0 0 10px 10px;
-    max-height: 220px;
-    overflow-y: auto;
-    z-index: 50;
-    display: none;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-  }
-
-  .select-dropdown.show { display: block; }
-
-  .select-dropdown .select-option {
-    padding: 11px 16px;
-    font-size: 15px;
-    cursor: pointer;
-    transition: background 0.15s;
-    color: #2d3436;
-  }
-
-  .select-dropdown .select-option:hover,
-  .select-dropdown .select-option.highlighted {
-    background: linear-gradient(135deg, rgba(102,126,234,0.08), rgba(118,75,162,0.08));
-    color: #667eea;
-  }
-
-  .select-dropdown .select-option .match-highlight { font-weight: 700; color: #764ba2; }
-
-  .select-dropdown .no-match {
-    padding: 14px 16px;
-    font-size: 14px;
-    color: #bbb;
-    text-align: center;
-  }
-
   /* ===== 图片上传区 ===== */
   .upload-area {
     border: 2px dashed #ddd;
@@ -610,15 +551,6 @@
         </div>
 
         <div class="form-group">
-          <label>你的名字 <span class="required">*</span></label>
-          <div class="searchable-select" id="contributor-select">
-            <input type="text" class="select-input" id="input-contributor" name="contributor" placeholder="输入首字母快速筛选" autocomplete="off" required>
-            <div class="select-dropdown" id="contributor-dropdown"></div>
-          </div>
-          <div class="hint">下次会自动帮你填好</div>
-        </div>
-
-        <div class="form-group">
           <label>分类 <span class="required">*</span></label>
           <div class="category-toggle" id="category-toggle">
             <button type="button" class="cat-option" data-value="wangzhe">🎮 王者相关</button>
@@ -811,79 +743,6 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     }
   });
 
-  // ===== 可搜索下拉选择器 =====
-  const MEMBERS = [
-    'aggiezhang', 'chupychu', 'evayao', 'hazzelchen', 'infpzhang',
-    'qianaxu', 'roarchen', 'shyaoliu', 'wenjingyang', 'xintongzou',
-    'yoyopiao', 'zaynnchen', 'zialin', 'ziminmeng'
-  ];
-
-  const contributorInput = document.getElementById('input-contributor');
-  const dropdown = document.getElementById('contributor-dropdown');
-  let highlightIdx = -1;
-
-  function renderDropdown(filter) {
-    const query = (filter || '').toLowerCase();
-    const matched = query ? MEMBERS.filter(m => m.toLowerCase().includes(query)) : MEMBERS;
-
-    if (matched.length === 0) {
-      dropdown.innerHTML = '<div class="no-match">没有匹配的成员</div>';
-      dropdown.classList.add('show');
-      highlightIdx = -1;
-      return;
-    }
-
-    dropdown.innerHTML = matched.map((name, i) => {
-      let display = name;
-      if (query) {
-        const idx = name.toLowerCase().indexOf(query);
-        display = name.slice(0, idx) + '<span class="match-highlight">' + name.slice(idx, idx + query.length) + '</span>' + name.slice(idx + query.length);
-      }
-      return '<div class="select-option" data-value="' + name + '" data-index="' + i + '">' + display + '</div>';
-    }).join('');
-
-    highlightIdx = -1;
-    dropdown.classList.add('show');
-  }
-
-  function selectOption(value) {
-    contributorInput.value = value;
-    dropdown.classList.remove('show');
-    localStorage.setItem('meme_contributor', value);
-  }
-
-  function updateHighlight() {
-    const options = dropdown.querySelectorAll('.select-option');
-    options.forEach((o, i) => {
-      o.classList.toggle('highlighted', i === highlightIdx);
-      if (i === highlightIdx) o.scrollIntoView({ block: 'nearest' });
-    });
-  }
-
-  contributorInput.addEventListener('focus', () => renderDropdown(contributorInput.value));
-  contributorInput.addEventListener('input', () => renderDropdown(contributorInput.value));
-
-  contributorInput.addEventListener('keydown', (e) => {
-    const options = dropdown.querySelectorAll('.select-option');
-    if (!dropdown.classList.contains('show') || options.length === 0) return;
-    if (e.key === 'ArrowDown') { e.preventDefault(); highlightIdx = (highlightIdx + 1) % options.length; updateHighlight(); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); highlightIdx = highlightIdx <= 0 ? options.length - 1 : highlightIdx - 1; updateHighlight(); }
-    else if (e.key === 'Enter' && highlightIdx >= 0) { e.preventDefault(); selectOption(options[highlightIdx].dataset.value); }
-    else if (e.key === 'Escape') { dropdown.classList.remove('show'); }
-  });
-
-  dropdown.addEventListener('click', (e) => {
-    const opt = e.target.closest('.select-option');
-    if (opt) selectOption(opt.dataset.value);
-  });
-
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('#contributor-select')) dropdown.classList.remove('show');
-  });
-
-  const savedContributor = localStorage.getItem('meme_contributor');
-  if (savedContributor) contributorInput.value = savedContributor;
-
   // ===== 分类选择按钮 =====
   const catToggle = document.getElementById('category-toggle');
   const catInput = document.getElementById('input-category');
@@ -913,7 +772,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   }
 
   // ===== 企微 Webhook =====
-  async function sendWebhook(memeName, contributor) {
+  async function sendWebhook(memeName) {
     if (!WEBHOOK_URL) return;
     try {
       await fetch(WEBHOOK_URL, {
@@ -922,7 +781,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
         body: JSON.stringify({
           msgtype: 'markdown',
           markdown: {
-            content: '🔥 **新热梗录入 🖼️**\n> 梗名：**' + memeName + '**\n> 贡献者：' + contributor
+            content: '🔥 **新热梗录入 🖼️**\n> 梗名：**' + memeName + '**'
           }
         })
       });
@@ -943,11 +802,9 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
 
     const name = document.getElementById('input-name').value.trim();
     const sourceUrl = document.getElementById('input-url').value.trim();
-    const contributor = contributorInput.value.trim();
 
     if (!name) { showToast('请填写梗名称', 'error'); return; }
     if (!sourceUrl) { showToast('请填写来源链接', 'error'); return; }
-    if (!contributor) { showToast('请选择你的名字', 'error'); return; }
 
     submitBtn.disabled = true;
     submitBtn.textContent = '⏳ 提交中...';
@@ -965,7 +822,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
         name: name,
         summary: '',
         source_url: sourceUrl,
-        contributor: contributor,
+        contributor: '',
         category: catInput.value,
         priority: '',
         image_path: imageUrl,
@@ -977,17 +834,13 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       const { error } = await sb.from('memes').insert(meme);
       if (error) throw new Error(error.message);
 
-      // 3. 记住名字
-      localStorage.setItem('meme_contributor', contributor);
-
-      // 4. Webhook 通知
-      sendWebhook(name, contributor);
+      // 3. Webhook 通知
+      sendWebhook(name);
 
       showToast('✅ 已记录热梗：' + name, 'success');
 
       // 重置表单
       form.reset();
-      contributorInput.value = contributor;
       uploadPreview.src = '';
       uploadArea.classList.remove('has-image');
       catToggle.querySelectorAll('.cat-option').forEach(b => b.classList.remove('selected'));
@@ -1068,7 +921,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
             ({red:'🔴 必上',orange:'🟠 推荐',blue:'🔵 可选',gray:'⚪ 不上报'}[c]) + '"></span>';
         });
         html += '</div></div>';
-        html += '<div class="meme-meta">by ' + escapeHtml(m.contributor) + ' · ' + dateStr + '</div>';
+        html += '<div class="meme-meta">' + dateStr + '</div>';
         html += '</div>';
         // 删除按钮
         html += '<button class="delete-btn" data-id="' + m.id + '" data-name="' + escapeHtml(m.name) + '" title="删除">🗑️</button>';
@@ -1302,7 +1155,6 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
           html += ' · <span class="expire-warn">即将过期</span>';
         }
         html += '</div>';
-        html += '<div class="meme-meta">by ' + escapeHtml(m.contributor) + '</div>';
         html += '</div>';
         // 恢复 + 永久删除按钮
         html += '<button class="restore-btn" data-id="' + m.id + '" title="恢复">↩ 恢复</button>';
