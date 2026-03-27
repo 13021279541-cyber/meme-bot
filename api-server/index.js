@@ -259,19 +259,34 @@ app.post('/screenshot-report', async (req, res) => {
     });
 
     const page = await browser.newPage();
-    // 16:9 宽屏匹配周报布局（1920x1080 四列卡片）
-    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 2 });
+    // 16:9 宽屏匹配周报布局（1920x1080，1.5x 清晰度）
+    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1.5 });
     await page.goto(reportUrl, { waitUntil: 'networkidle0', timeout: 30000 });
 
     // 等待报告内容+图片渲染完成
     await new Promise(r => setTimeout(r, 3500));
 
-    // 截取完整页面
-    const screenshotBuffer = await page.screenshot({
+    // 截取完整页面，自动压缩到 2MB 以内（企微限制）
+    const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+    let quality = 82;
+    let screenshotBuffer = await page.screenshot({
       fullPage: true,
       type: 'jpeg',
-      quality: 95
+      quality
     });
+    console.log(`[screenshot] 首次截图 quality=${quality}, 大小: ${(screenshotBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+
+    // 如果超 2MB，逐步降低质量重新截图
+    while (screenshotBuffer.length > MAX_SIZE && quality > 30) {
+      quality -= 10;
+      console.log(`[screenshot] 超过2MB，降低质量重试 quality=${quality}`);
+      screenshotBuffer = await page.screenshot({
+        fullPage: true,
+        type: 'jpeg',
+        quality
+      });
+      console.log(`[screenshot] 重试结果 quality=${quality}, 大小: ${(screenshotBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+    }
 
     await browser.close();
 
