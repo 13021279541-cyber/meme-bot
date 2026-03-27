@@ -128,15 +128,14 @@ function connect() {
     // ---- 收到用户消息 → 梗录入处理 ----
     if (cmd === 'aibot_msg_callback') {
       const body = msg.body || {};
-      log('INFO', `收到用户消息 [${body.chattype}]`, {
-        chatid: body.chatid,
-        from: body.from,
-        msgtype: body.msgtype,
-        content: body.text && body.text.content
-      });
+      // 完整打印原始消息体，便于调试
+      log('INFO', `[callback] 收到完整消息体:`, body);
+      log('INFO', `[callback] chattype=${body.chattype}, msgtype=${body.msgtype}, from=${body.from}, chatid=${body.chatid}`);
+      if (body.text) log('INFO', `[callback] text.content="${body.text.content}"`);
+      if (body.image) log('INFO', `[callback] image=`, body.image);
       // 处理录入请求
       handleMemeInput(body).catch(err => {
-        log('ERROR', `[meme-input] 处理失败: ${err.message}`);
+        log('ERROR', `[meme-input] 处理失败: ${err.message}`, err.stack);
       });
     }
 
@@ -595,8 +594,11 @@ async function handleMemeInput(body) {
   // 2. 只处理文字消息
   if (msgtype !== 'text') return;
 
-  const text = (body.text && body.text.content) || '';
-  if (!text.trim()) return;
+  let text = (body.text && body.text.content) || '';
+  // 去掉 @mention 标记（企微回调中 @机器人 可能以多种形式出现）
+  text = text.replace(/@[\u4e00-\u9fa5\w\-]+\s*/g, '').trim();
+  log('INFO', `[meme-input] 清洗后文本: "${text}"`);
+  if (!text) return;
 
   // 3. 判断是否为录入指令
   if (!isMemeCommand(text)) {
