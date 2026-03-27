@@ -259,18 +259,18 @@ app.post('/screenshot-report', async (req, res) => {
     });
 
     const page = await browser.newPage();
-    // 手机宽度，紧凑截图
-    await page.setViewport({ width: 640, height: 960, deviceScaleFactor: 2 });
+    // 16:9 宽屏匹配周报布局（1920x1080 四列卡片）
+    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 2 });
     await page.goto(reportUrl, { waitUntil: 'networkidle0', timeout: 30000 });
 
-    // 等待报告内容渲染完成
-    await new Promise(r => setTimeout(r, 2500));
+    // 等待报告内容+图片渲染完成
+    await new Promise(r => setTimeout(r, 3500));
 
     // 截取完整页面
     const screenshotBuffer = await page.screenshot({
       fullPage: true,
       type: 'jpeg',
-      quality: 85
+      quality: 95
     });
 
     await browser.close();

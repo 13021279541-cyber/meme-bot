@@ -15,6 +15,7 @@
 const WebSocket = require('ws');
 const http = require('http');
 const crypto = require('crypto');
+const https = require('https');
 
 // ========== 配置（从环境变量读取） ==========
 const BOT_ID     = process.env.BOT_ID     || '';
@@ -124,7 +125,7 @@ function connect() {
       return;
     }
 
-    // ---- 收到用户消息（可选：记录 chatid 供推送使用） ----
+    // ---- 收到用户消息 → 梗录入处理 ----
     if (cmd === 'aibot_msg_callback') {
       const body = msg.body || {};
       log('INFO', `收到用户消息 [${body.chattype}]`, {
@@ -133,7 +134,10 @@ function connect() {
         msgtype: body.msgtype,
         content: body.text && body.text.content
       });
-      // 可在此处扩展：将 chatid 保存到文件/DB，用于后续推送
+      // 处理录入请求
+      handleMemeInput(body).catch(err => {
+        log('ERROR', `[meme-input] 处理失败: ${err.message}`);
+      });
     }
 
     // ---- 收到事件回调 ----
@@ -426,6 +430,238 @@ httpServer.listen(HTTP_PORT, '127.0.0.1', () => {
 
 // 建立 WebSocket 连接
 connect();
+
+// ========== 梗录入模块 ==========
+
+// API 地址（index.js 同机，端口 3000）
+const API_PORT = parseInt(process.env.PORT || '3000');
+
+// 最近图片缓存：按 chatid:from 存储，5 分钟有效
+const recentImages = {};
+const IMAGE_CACHE_TTL = 5 * 60 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const key of Object.keys(recentImages)) {
+    if (now - recentImages[key].timestamp > IMAGE_CACHE_TTL) {
+      delete recentImages[key];
+    }
+  }
+}, 60000);
+
+// 提取文本中的 URL
+function extractUrl(text) {
+  if (!text) return null;
+  const m = text.match(/https?:\/\/[^\s<>"{}|\\^`\[\]]+/i);
+  return m ? m[0] : null;
+}
+
+// 判断是否为录入指令（@机器人后的文本）
+function isMemeCommand(text) {
+  if (!text) return false;
+  const t = text.trim();
+  return /^(录入|录|记录|收录|添加|新增)\s/i.test(t) || extractUrl(t) !== null;
+}
+
+// 解析梗名称和链接
+function parseMemeText(text) {
+  if (!text) return null;
+  let t = text.trim();
+  // 去掉指令词
+  t = t.replace(/^(录入|录|记录|收录|添加|新增)\s+/i, '').trim();
+  const url = extractUrl(t);
+  let name = url ? t.replace(url, '').trim() : t.trim();
+  name = name.replace(/[,，。.、\s]+$/g, '').trim();
+  if (!name && !url) return null;
+  return { name: name || null, source_url: url || null };
+}
+
+// 调用本地 API 创建梗
+function createMeme(memeData) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(memeData);
+    const req = http.request({
+      hostname: '127.0.0.1',
+      port: API_PORT,
+      path: '/memes',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const result = JSON.parse(data);
+          if (res.statusCode >= 200 && res.statusCode < 300) resolve(result);
+          else reject(new Error(result.error || `HTTP ${res.statusCode}`));
+        } catch (e) { reject(new Error(data)); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+// 给群里回复 markdown 消息
+function replyToChat(chatid, chatType, content) {
+  const payload = buildMarkdownMsg(chatid, chatType || CHAT_TYPE, content);
+  sendMsgViaWS(payload);
+}
+
+// 将企微图片 URL 转存到 Supabase Storage
+function uploadImageToSupabase(imageUrl) {
+  return new Promise((resolve) => {
+    const protocol = imageUrl.startsWith('https') ? https : http;
+    protocol.get(imageUrl, { headers: { 'User-Agent': 'MemeBot/1.0' } }, (res) => {
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        return uploadImageToSupabase(res.headers.location).then(resolve);
+      }
+      if (res.statusCode !== 200) {
+        log('WARN', `[meme-input] 图片下载失败: HTTP ${res.statusCode}`);
+        resolve(null);
+        return;
+      }
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('end', () => {
+        const buffer = Buffer.concat(chunks);
+        const contentType = res.headers['content-type'] || 'image/png';
+        const ext = contentType.includes('jpeg') || contentType.includes('jpg') ? 'jpg' : 'png';
+        const filename = `meme_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+        const supabaseUrl = process.env.SUPABASE_URL || 'https://iwmvtizwcibusjjiquwq.supabase.co';
+        const supabaseKey = process.env.SUPABASE_ANON_KEY || '';
+        if (!supabaseKey) {
+          log('WARN', '[meme-input] 未配置 SUPABASE_ANON_KEY，跳过图片上传');
+          resolve(null);
+          return;
+        }
+
+        const uploadPath = `/storage/v1/object/meme-images/${filename}`;
+        const uploadUrlObj = new URL(uploadPath, supabaseUrl);
+        const uploadReq = https.request({
+          hostname: uploadUrlObj.hostname,
+          path: uploadUrlObj.pathname,
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseKey}`,
+            'apikey': supabaseKey,
+            'Content-Type': contentType,
+            'Content-Length': buffer.length,
+            'x-upsert': 'true'
+          }
+        }, (uploadRes) => {
+          let data = '';
+          uploadRes.on('data', chunk => data += chunk);
+          uploadRes.on('end', () => {
+            if (uploadRes.statusCode === 200 || uploadRes.statusCode === 201) {
+              const publicUrl = `${supabaseUrl}/storage/v1/object/public/meme-images/${filename}`;
+              log('INFO', `[meme-input] 图片上传成功: ${publicUrl}`);
+              resolve(publicUrl);
+            } else {
+              log('ERROR', `[meme-input] Supabase 上传失败: ${uploadRes.statusCode} ${data}`);
+              resolve(null);
+            }
+          });
+        });
+        uploadReq.on('error', (e) => { log('ERROR', `[meme-input] 上传出错: ${e.message}`); resolve(null); });
+        uploadReq.write(buffer);
+        uploadReq.end();
+      });
+    }).on('error', (e) => { log('ERROR', `[meme-input] 图片下载出错: ${e.message}`); resolve(null); });
+  });
+}
+
+// 主处理函数：解析群消息并录入
+async function handleMemeInput(body) {
+  const { chatid, from, msgtype } = body;
+  const chatType = body.chattype === 'single' ? 1 : 2;
+  const cacheKey = `${chatid}:${from}`;
+
+  // 1. 收到图片消息 → 缓存起来等后续文字指令
+  if (msgtype === 'image') {
+    const imageInfo = body.image || {};
+    log('INFO', `[meme-input] 收到图片，缓存 ${cacheKey}`, imageInfo);
+    recentImages[cacheKey] = {
+      url: imageInfo.url || null,
+      media_id: imageInfo.media_id || null,
+      timestamp: Date.now()
+    };
+    // 不回复，等用户发文字指令
+    return;
+  }
+
+  // 2. 只处理文字消息
+  if (msgtype !== 'text') return;
+
+  const text = (body.text && body.text.content) || '';
+  if (!text.trim()) return;
+
+  // 3. 判断是否为录入指令
+  if (!isMemeCommand(text)) {
+    // 帮助命令
+    if (/^(帮助|help|用法|怎么用|\?|？)$/i.test(text.trim())) {
+      replyToChat(chatid, chatType,
+        '**🤖 热梗录入助手**\n\n' +
+        '在群里 @我 即可录入热梗：\n' +
+        '> **格式1**：`录入 梗名称 链接`\n' +
+        '> **格式2**：先发截图，再 @我 说 `录入 梗名称 链接`\n' +
+        '> **格式3**：`梗名称 链接`（只要有链接就行）\n\n' +
+        '链接支持抖音、小红书、B站等\n' +
+        '截图会自动关联到最近一条录入'
+      );
+    }
+    return;
+  }
+
+  // 4. 解析文本
+  const parsed = parseMemeText(text);
+  if (!parsed || !parsed.name) {
+    replyToChat(chatid, chatType, '❌ 没解析到梗名称，请用格式：`录入 梗名称 链接`');
+    return;
+  }
+
+  if (!parsed.source_url) {
+    replyToChat(chatid, chatType, '❌ 缺少来源链接，请用格式：`录入 梗名称 链接`');
+    return;
+  }
+
+  // 5. 检查缓存的图片
+  let imageUrl = null;
+  if (recentImages[cacheKey]) {
+    const cached = recentImages[cacheKey];
+    if (cached.url) {
+      imageUrl = await uploadImageToSupabase(cached.url);
+    }
+    delete recentImages[cacheKey]; // 用完清除
+  }
+
+  // 6. 调用 API 录入
+  try {
+    const memeData = {
+      name: parsed.name,
+      source_url: parsed.source_url,
+      category: 'public',  // 默认大众热点，后续可在网页修改
+      priority: '',         // 默认无等级，后续可在网页修改
+    };
+    if (imageUrl) memeData.image_path = imageUrl;
+
+    const result = await createMeme(memeData);
+    log('INFO', `[meme-input] 录入成功: ${parsed.name}`, result);
+
+    let reply = `✅ **已录入**「${parsed.name}」\n`;
+    reply += `> 🔗 [来源链接](${parsed.source_url})\n`;
+    if (imageUrl) reply += `> 📷 截图已保存\n`;
+    else reply += `> 💡 可在网页补充截图\n`;
+    reply += `> 📝 分类/等级可在[热梗管理页](http://21.6.179.196:3000)调整`;
+
+    replyToChat(chatid, chatType, reply);
+  } catch (err) {
+    log('ERROR', `[meme-input] 录入失败: ${err.message}`);
+    replyToChat(chatid, chatType, `❌ 录入失败：${err.message}`);
+  }
+}
 
 // 优雅退出
 process.on('SIGINT', () => {
