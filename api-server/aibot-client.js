@@ -608,10 +608,9 @@ async function handleMemeInput(body) {
         '**🤖 热梗录入助手**\n\n' +
         '在群里 @我 即可录入热梗：\n' +
         '> **格式1**：`录入 梗名称 链接`\n' +
-        '> **格式2**：先发截图，再 @我 说 `录入 梗名称 链接`\n' +
-        '> **格式3**：`梗名称 链接`（只要有链接就行）\n\n' +
+        '> **格式2**：`梗名称 链接`（只要有链接就行）\n\n' +
         '链接支持抖音、小红书、B站等\n' +
-        '截图会自动关联到最近一条录入'
+        '💡 截图请在录入后通过回复中的链接上传'
       );
     }
     return;
@@ -652,10 +651,15 @@ async function handleMemeInput(body) {
     const result = await createMeme(memeData);
     log('INFO', `[meme-input] 录入成功: ${parsed.name}`, result);
 
+    const memeId = result && result.id ? result.id : '';
     let reply = `✅ **已录入**「${parsed.name}」\n`;
     reply += `> 🔗 [来源链接](${parsed.source_url})\n`;
-    if (imageUrl) reply += `> 📷 截图已保存\n`;
-    else reply += `> 💡 可在网页补充截图\n`;
+    if (imageUrl) {
+      reply += `> 📷 截图已保存\n`;
+    } else {
+      reply += `> ⚠️ **需补截图**（群聊暂不支持图片识别）\n`;
+      reply += `> 👉 [点击上传截图](http://21.6.179.196:3000?edit=${memeId})\n`;
+    }
     reply += `> 📝 分类/等级可在[热梗管理页](http://21.6.179.196:3000)调整`;
 
     replyToChat(chatid, chatType, reply);
