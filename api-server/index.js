@@ -3,12 +3,15 @@
  * 部署在 DevCloud CVM，连接内网 MySQL
  * 供前端页面 + 企微智能机器人调用
  */
+try { require('dotenv').config(); } catch (e) { /* dotenv 非必须，CVM 可通过 PM2 env 配置 */ }
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
 const crypto = require('crypto');
 
 const path = require('path');
+
+const PORT = process.env.PORT || 3000;
 
 const app = express();
 app.use(cors());
@@ -18,11 +21,15 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ===== MySQL 连接池 =====
+if (!process.env.DB_PASS) {
+  console.error('[FATAL] 环境变量 DB_PASS 未设置，请配置 .env 文件');
+  process.exit(1);
+}
 const pool = mysql.createPool({
   host: process.env.DB_HOST || '9.134.177.112',
   port: parseInt(process.env.DB_PORT || '3306'),
   user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASS || 'GEAKV*2543cebw',
+  password: process.env.DB_PASS,
   database: process.env.DB_NAME || 'meme_bot',
   charset: 'utf8mb4',
   waitForConnections: true,
@@ -279,7 +286,7 @@ app.post('/screenshot-report', async (req, res) => {
     const filepath = path.join(screenshotDir, filename);
     fs.writeFileSync(filepath, screenshotBuffer);
 
-    const serverHost = `http://21.6.179.196:3000`;
+    const serverHost = process.env.SERVER_HOST || `http://127.0.0.1:${PORT}`;
     const imageUrl = `${serverHost}/screenshots/${filename}`;
     const publicReportUrl = `${serverHost}/?report=${startDate}_${endDate}`;
 
@@ -335,7 +342,7 @@ app.post("/push-image", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ ok: false, error: "没有收到图片" });
 
-    const serverHost = "http://21.6.179.196:3000";
+    const serverHost = process.env.SERVER_HOST || `http://127.0.0.1:${PORT}`;
     const imageUrl = serverHost + "/screenshots/" + req.file.filename;
     const title = req.body.title || "热梗洞察周报";
     const extra = req.body.extra || "";
@@ -409,7 +416,6 @@ function getWeekNumber(d) {
 }
 
 // ===== 启动 =====
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[API] Meme Bot API running on port ${PORT}`);
   console.log(`[API] MySQL: ${pool.pool.config.connectionConfig.host}:${pool.pool.config.connectionConfig.port}`);
