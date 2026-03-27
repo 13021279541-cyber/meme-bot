@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>热梗洞察系统 - 功能说明文档</title>
+<style>
+  :root {
+    --bg: #f8f9fa;
+    --card: #ffffff;
+    --text: #1a1a2e;
+    --text2: #555;
+    --accent: #4361ee;
+    --accent2: #3a0ca3;
+    --border: #e0e0e0;
+    --code-bg: #f0f0f5;
+    --red: #e63946;
+    --orange: #f4a261;
+    --blue: #457b9d;
+    --gray: #adb5bd;
+    --green: #2a9d8f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+  }
+  .hero {
+    background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 50%, #7209b7 100%);
+    color: white;
+    padding: 60px 40px 50px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 2.4em; font-weight: 800; letter-spacing: 2px; }
+  .hero .sub { margin-top: 12px; font-size: 1.05em; opacity: 0.85; }
+  .hero .meta { margin-top: 20px; font-size: 0.85em; opacity: 0.6; }
+  .container { max-width: 960px; margin: 0 auto; padding: 40px 24px 80px; }
+  .toc {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin-bottom: 36px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .toc h2 { font-size: 1.2em; margin-bottom: 14px; color: var(--accent2); }
+  .toc ul { list-style: none; columns: 2; column-gap: 32px; }
+  .toc li { margin-bottom: 6px; }
+  .toc a { color: var(--accent); text-decoration: none; font-size: 0.95em; }
+  .toc a:hover { text-decoration: underline; }
+
+  section {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 32px 36px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  h2 {
+    font-size: 1.5em;
+    color: var(--accent2);
+    margin-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2 .num {
+    background: var(--accent);
+    color: white;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75em;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  h3 { font-size: 1.1em; color: var(--text); margin: 20px 0 10px; }
+  p { margin-bottom: 12px; color: var(--text2); }
+  ul, ol { margin: 0 0 14px 20px; color: var(--text2); }
+  li { margin-bottom: 4px; }
+  strong { color: var(--text); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 18px;
+    font-size: 0.92em;
+  }
+  th {
+    background: var(--accent);
+    color: white;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+  }
+  th:first-child { border-radius: 6px 0 0 0; }
+  th:last-child { border-radius: 0 6px 0 0; }
+  td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text2);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: #fafafe; }
+
+  code {
+    background: var(--code-bg);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.88em;
+    font-family: "Fira Code", "Consolas", monospace;
+    color: var(--accent2);
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 600;
+    color: white;
+  }
+  .badge-red { background: var(--red); }
+  .badge-orange { background: var(--orange); color: #333; }
+  .badge-blue { background: var(--blue); }
+  .badge-gray { background: var(--gray); }
+  .badge-green { background: var(--green); }
+
+  .tip {
+    background: #eef4ff;
+    border-left: 4px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin: 14px 0;
+    font-size: 0.93em;
+    color: var(--text2);
+  }
+  .tip::before { content: "💡 "; }
+
+  .warn {
+    background: #fff8e6;
+    border-left: 4px solid var(--orange);
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin: 14px 0;
+    font-size: 0.93em;
+    color: var(--text2);
+  }
+  .warn::before { content: "⚠️ "; }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 16px 0;
+    flex-wrap: wrap;
+  }
+  .flow-step {
+    background: var(--accent);
+    color: white;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 0.88em;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .flow-arrow {
+    font-size: 1.4em;
+    color: var(--accent);
+    margin: 0 6px;
+  }
+
+  .scenario {
+    background: #f0f4ff;
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 14px 0;
+  }
+  .scenario h4 { color: var(--accent2); margin-bottom: 8px; font-size: 1em; }
+  .scenario ol { margin-left: 18px; }
+
+  .dot {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+  .dot-red { background: var(--red); }
+  .dot-orange { background: var(--orange); }
+  .dot-blue { background: var(--blue); }
+  .dot-gray { background: var(--gray); }
+
+  .footer {
+    text-align: center;
+    color: #999;
+    font-size: 0.85em;
+    padding: 30px 0 10px;
+  }
+
+  @media (max-width: 600px) {
+    .hero { padding: 40px 20px 30px; }
+    .hero h1 { font-size: 1.6em; }
+    .container { padding: 20px 12px 40px; }
+    section { padding: 20px 18px; }
+    .toc ul { columns: 1; }
+    .flow { flex-direction: column; gap: 6px; }
+    .flow-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>🔥 热梗洞察系统</h1>
+  <div class="sub">功能说明文档</div>
+  <div class="meta">v1.0 · 2026-03-27 · 用户社区组</div>
+</div>
+
+<div class="container">
+
+<!-- 目录 -->
+<div class="toc">
+  <h2>📑 目录</h2>
+  <ul>
+    <li><a href="#s1">一、系统概述</a></li>
+    <li><a href="#s2">二、企微群聊录入</a></li>
+    <li><a href="#s3">三、Web 网页录入</a></li>
+    <li><a href="#s4">四、权限系统</a></li>
+    <li><a href="#s5">五、热梗列表管理</a></li>
+    <li><a href="#s6">六、回收站</a></li>
+    <li><a href="#s7">七、周报生成与推送</a></li>
+    <li><a href="#s8">八、腾讯文档同步</a></li>
+    <li><a href="#s9">九、特殊 URL 模式</a></li>
+    <li><a href="#s10">十、API 接口列表</a></li>
+    <li><a href="#s11">十一、日常操作指南</a></li>
+    <li><a href="#s12">十二、团队成员</a></li>
+  </ul>
+</div>
+
+<!-- 一、系统概述 -->
+<section id="s1">
+  <h2><span class="num">1</span> 系统概述</h2>
+  <p>「热梗洞察」是一套 <strong>热梗收集 → 管理 → 周报生成 → 企微推送</strong> 的全链路工具，服务于用户社区组的内容运营工作。</p>
+
+  <div class="flow">
+    <span class="flow-step">📥 收集热梗</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">📋 分类筛选</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">📊 生成周报</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">📣 推送企微</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">📄 同步文档</span>
+  </div>
+
+  <h3>系统架构</h3>
+  <table>
+    <tr><th>组件</th><th>说明</th></tr>
+    <tr><td><strong>Web 管理页面</strong></td><td>热梗录入、编辑、筛选、周报生成、推送企微</td></tr>
+    <tr><td><strong>API 服务</strong></td><td>Node.js Express，提供 RESTful 接口</td></tr>
+    <tr><td><strong>企微智能机器人</strong></td><td>WebSocket 长连接，支持群聊录入 + 消息推送</td></tr>
+    <tr><td><strong>数据存储</strong></td><td>DevCloud MySQL（数据）+ Supabase Storage（图片 CDN）</td></tr>
+    <tr><td><strong>腾讯文档</strong></td><td>智能表格自动同步，供全组查阅</td></tr>
+  </table>
+  <p><strong>访问地址：</strong><code>http://21.6.179.196:3000</code>（腾讯内网）</p>
+</section>
+
+<!-- 二、企微群聊录入 -->
+<section id="s2">
+  <h2><span class="num">2</span> 企微群聊录入（机器人）</h2>
+  <p>在企微群里 <strong>@机器人</strong> 即可录入热梗，无需打开网页。</p>
+
+  <h3>2.1 录入格式</h3>
+  <table>
+    <tr><th>格式</th><th>示例</th></tr>
+    <tr><td><code>录入 梗名称 链接</code></td><td>录入 我在王者当导演 https://v.douyin.com/xxx</td></tr>
+    <tr><td><code>梗名称 链接</code></td><td>AI换脸挑战 https://v.douyin.com/xxx（有链接即触发）</td></tr>
+  </table>
+  <p>支持的指令词：<code>录入</code> <code>录</code> <code>记录</code> <code>收录</code> <code>添加</code> <code>新增</code></p>
+
+  <h3>2.2 带截图录入</h3>
+  <ol>
+    <li>先在群里发一张截图</li>
+    <li>5 分钟内 @机器人 发录入指令</li>
+    <li>截图会自动关联到该条热梗</li>
+  </ol>
+  <div class="tip">如果忘了先发截图，录入成功后会收到「补截图」链接，点击即可在网页上传。</div>
+
+  <h3>2.3 帮助命令</h3>
+  <p>@机器人 发 <code>帮助</code> / <code>help</code> / <code>?</code> 查看使用说明。</p>
+
+  <h3>2.4 默认值</h3>
+  <ul>
+    <li>分类：大众热点</li>
+    <li>等级：无（后续在网页调整）</li>
+  </ul>
+
+  <h3>2.5 多群支持</h3>
+  <table>
+    <tr><th>群</th><th>说明</th></tr>
+    <tr><td>热梗主群</td><td>日常工作群，正式推送</td></tr>
+    <tr><td>体验群</td><td>测试用途</td></tr>
+  </table>
+  <p>推送周报时默认 <strong>广播到所有群</strong>。</p>
+</section>
+
+<!-- 三、Web 网页录入 -->
+<section id="s3">
+  <h2><span class="num">3</span> Web 网页录入</h2>
+  <p>访问 <code>http://21.6.179.196:3000</code>，登录管理员后进入「📝 录入」Tab。</p>
+
+  <h3>3.1 录入表单</h3>
+  <table>
+    <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+    <tr><td>梗名称</td><td>✅</td><td>热梗标题</td></tr>
+    <tr><td>来源链接</td><td>✅</td><td>抖音 / 小红书 / B站等视频链接</td></tr>
+    <tr><td>分类</td><td>✅</td><td>🎮 王者相关 或 🌍 大众热点，按钮切换选择</td></tr>
+    <tr><td>截图</td><td>✅</td><td>支持点击选择、拖拽上传，最大 10MB</td></tr>
+    <tr><td>一句话概括</td><td>❌</td><td>可录入时填写，也可后续在列表中补填</td></tr>
+  </table>
+
+  <h3>3.2 图片存储</h3>
+  <p>截图上传到 Supabase Storage（公网 CDN），不受内网限制，任何人可查看。</p>
+</section>
+
+<!-- 四、权限系统 -->
+<section id="s4">
+  <h2><span class="num">4</span> 权限系统</h2>
+
+  <h3>4.1 两种模式</h3>
+  <table>
+    <tr><th>模式</th><th>可见 Tab</th><th>权限</th></tr>
+    <tr><td><strong>游客</strong>（默认）</td><td>📋 已录入</td><td>只读浏览，灰色梗自动隐藏</td></tr>
+    <tr><td><strong>管理员</strong></td><td>📝 录入 / 📋 已录入 / 🗑️ 回收站 / 📊 周报</td><td>全部功能</td></tr>
+  </table>
+
+  <h3>4.2 登录方式</h3>
+  <ul>
+    <li>点击页面右上角 🔐 图标</li>
+    <li>账号：<code>memebot</code> / 密码：<code>memebot2026</code></li>
+    <li>登录状态保存在浏览器本地（刷新不丢失）</li>
+    <li>登录后右上角变为「👋 退出管理」</li>
+  </ul>
+</section>
+
+<!-- 五、热梗列表管理 -->
+<section id="s5">
+  <h2><span class="num">5</span> 热梗列表管理</h2>
+  <p>「📋 已录入」Tab 是核心操作区。</p>
+
+  <h3>5.1 查看信息</h3>
+  <p>每条热梗显示：缩略图、名称、来源链接、一句话概括、分类标签、等级圆点、录入时间 / 周数。</p>
+
+  <h3>5.2 内联编辑（管理员）</h3>
+  <table>
+    <tr><th>操作</th><th>方式</th></tr>
+    <tr><td>编辑名称</td><td>点击名称文字 → 输入框 → Enter 保存 / Esc 取消</td></tr>
+    <tr><td>编辑概括</td><td>点击概括文字（空概括显示「点击添加概括」）</td></tr>
+    <tr><td>编辑来源链接</td><td>点击链接区域</td></tr>
+    <tr><td>更换截图</td><td>点击缩略图 → 弹出文件选择器</td></tr>
+  </table>
+
+  <h3>5.3 分类切换</h3>
+  <p>点击分类标签，在 <span class="badge badge-green">🎮 王者相关</span> 和 <span class="badge badge-blue">🌍 大众热点</span> 之间一键切换。</p>
+
+  <h3>5.4 等级设置</h3>
+  <p>四色圆点系统，点击即切换：</p>
+  <table>
+    <tr><th>颜色</th><th>含义</th><th>说明</th></tr>
+    <tr><td><span class="dot dot-red"></span> 红色</td><td>必上</td><td>本期必须上报的重点热梗</td></tr>
+    <tr><td><span class="dot dot-orange"></span> 橙色</td><td>推荐</td><td>建议上报</td></tr>
+    <tr><td><span class="dot dot-blue"></span> 蓝色</td><td>可选</td><td>备选梗</td></tr>
+    <tr><td><span class="dot dot-gray"></span> 灰色</td><td>淘汰</td><td>不上报，游客模式自动隐藏</td></tr>
+  </table>
+
+  <h3>5.5 官号跟进 & 作者激励</h3>
+  <p>管理员可为每条梗添加：</p>
+  <ul>
+    <li><strong>📢 官号跟进</strong>：标题文案 + 跳转链接 + 图片</li>
+    <li><strong>🎯 作者激励</strong>：话题词（如 #雪山救狐#）+ 优质作品链接</li>
+  </ul>
+
+  <h3>5.6 删除</h3>
+  <p>点击删除按钮 → 确认对话框 → 移入回收站（软删除，可恢复）。</p>
+</section>
+
+<!-- 六、回收站 -->
+<section id="s6">
+  <h2><span class="num">6</span> 回收站</h2>
+  <p>「🗑️ 回收站」Tab（仅管理员可见）：</p>
+  <table>
+    <tr><th>操作</th><th>说明</th></tr>
+    <tr><td><strong>恢复</strong></td><td>一键恢复到正常列表</td></tr>
+    <tr><td><strong>永久删除</strong></td><td>二次确认后彻底删除，不可恢复</td></tr>
+  </table>
+</section>
+
+<!-- 七、周报生成与推送 -->
+<section id="s7">
+  <h2><span class="num">7</span> 周报生成与推送</h2>
+  <p>「📊 周报」Tab 是整个系统的核心输出环节。</p>
+
+  <h3>7.1 操作流程</h3>
+  <ol>
+    <li><strong>选择日期范围</strong>（默认：本周一 ~ 今天）</li>
+    <li><strong>点击「👀 预览周报」</strong>
+      <ul>
+        <li>自动过滤灰色梗</li>
+        <li>按等级排序：红 &gt; 橙 &gt; 蓝</li>
+        <li>生成 16:9 宽屏 HTML 周报（四列卡片布局）</li>
+        <li>前端截图生成缩略图预览（点击可全屏查看）</li>
+      </ul>
+    </li>
+    <li><strong>点击「📥 下载 HTML 周报」</strong>（可选）— 下载完整 HTML 文件到本地</li>
+    <li><strong>点击「📣 推送到企微群」</strong></li>
+  </ol>
+
+  <h3>7.2 推送三步流程</h3>
+  <div class="flow">
+    <span class="flow-step">① Markdown 清单</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">② 截图图片</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step">③ 同步腾讯文档</span>
+  </div>
+  <table>
+    <tr><th>步骤</th><th>内容</th><th>说明</th></tr>
+    <tr><td>① Markdown 清单</td><td>文字版热梗列表</td><td>含编号、链接、概括、官号跟进、作者激励，广播到所有群</td></tr>
+    <tr><td>② 截图图片</td><td>服务端 Puppeteer 自动截图</td><td>自动压缩到 2MB 以内，以图片消息发送</td></tr>
+    <tr><td>③ 同步腾讯文档</td><td>自动写入智能表格</td><td>后台静默执行</td></tr>
+  </table>
+
+  <h3>7.3 周报样式</h3>
+  <ul>
+    <li><strong>封面页</strong>：标题「热梗洞察周报」+ 词云展示本期热梗 + 日期范围 + 署名「by 用户社区组」</li>
+    <li><strong>内容页</strong>：每页 4 张卡片，竖版图片区域 520px 高，无图卡片用随机 emoji 占位</li>
+    <li>🎮 王者相关卡片有游戏手柄 badge 标注</li>
+    <li>卡片包含：截图、梗名称、一句话概括、来源链接、官号跟进、作者激励</li>
+  </ul>
+</section>
+
+<!-- 八、腾讯文档同步 -->
+<section id="s8">
+  <h2><span class="num">8</span> 腾讯文档同步</h2>
+  <p>每次推送周报时，热梗数据自动同步到腾讯文档智能表格。</p>
+  <ul>
+    <li><strong>智能表格链接</strong>：<a href="https://docs.qq.com/smartsheet/DSm5oVGdybWdkWkdH" target="_blank">https://docs.qq.com/smartsheet/DSm5oVGdybWdkWkdH</a></li>
+    <li><strong>同步字段</strong>：梗名称、截图、分类、等级、来源链接、一句话概括、录入日期、推送周期、官号跟进、作者激励</li>
+    <li><strong>视图</strong>：📌 本期推送 / 📋 上期回顾 / 📊 历史总览</li>
+  </ul>
+</section>
+
+<!-- 九、特殊 URL 模式 -->
+<section id="s9">
+  <h2><span class="num">9</span> 特殊 URL 模式</h2>
+  <table>
+    <tr><th>URL 参数</th><th>效果</th></tr>
+    <tr>
+      <td><code>?report=开始日期_结束日期</code></td>
+      <td>周报展示模式：隐藏所有 Tab，全屏 16:9 四列卡片周报（供截图用）</td>
+    </tr>
+    <tr>
+      <td><code>?edit=梗ID</code></td>
+      <td>快捷编辑模式：自动管理员登录 → 定位到该梗 → 高亮 → 弹出截图上传（配合群聊「补截图」链接）</td>
+    </tr>
+  </table>
+</section>
+
+<!-- 十、API 接口列表 -->
+<section id="s10">
+  <h2><span class="num">10</span> API 接口列表</h2>
+  <table>
+    <tr><th>方法</th><th>路径</th><th>说明</th></tr>
+    <tr><td><span class="badge badge-green">GET</span></td><td><code>/health</code></td><td>健康检查</td></tr>
+    <tr><td><span class="badge badge-green">GET</span></td><td><code>/memes</code></td><td>获取梗列表（支持分类、等级、日期过滤）</td></tr>
+    <tr><td><span class="badge badge-green">GET</span></td><td><code>/memes/:id</code></td><td>获取单条梗详情</td></tr>
+    <tr><td><span class="badge badge-blue">POST</span></td><td><code>/memes</code></td><td>新增热梗</td></tr>
+    <tr><td><span class="badge badge-orange">PATCH</span></td><td><code>/memes/:id</code></td><td>更新热梗字段</td></tr>
+    <tr><td><span class="badge badge-red">DELETE</span></td><td><code>/memes/:id</code></td><td>软删除（移入回收站）</td></tr>
+    <tr><td><span class="badge badge-blue">POST</span></td><td><code>/memes/:id/restore</code></td><td>恢复已删除的梗</td></tr>
+    <tr><td><span class="badge badge-green">GET</span></td><td><code>/deleted</code></td><td>获取回收站列表</td></tr>
+    <tr><td><span class="badge badge-red">DELETE</span></td><td><code>/memes/:id/permanent</code></td><td>永久删除</td></tr>
+    <tr><td><span class="badge badge-blue">POST</span></td><td><code>/screenshot-report</code></td><td>截图周报并推送图片</td></tr>
+    <tr><td><span class="badge badge-blue">POST</span></td><td><code>/upload-only</code></td><td>上传素材获取 media_id</td></tr>
+    <tr><td><span class="badge badge-blue">POST</span></td><td><code>/push-image</code></td><td>手动上传截图推送</td></tr>
+    <tr><td><span class="badge badge-blue">POST</span></td><td><code>/webhook/wecom</code></td><td>企微消息推送（支持广播）</td></tr>
+    <tr><td><span class="badge badge-green">GET</span></td><td><code>/webhook/aibot/chats</code></td><td>查看所有群列表</td></tr>
+    <tr><td><span class="badge badge-green">GET</span></td><td><code>/webhook/aibot/health</code></td><td>机器人连接状态</td></tr>
+    <tr><td><span class="badge badge-blue">POST</span></td><td><code>/sync-smartsheet</code></td><td>同步到腾讯文档智能表格</td></tr>
+  </table>
+</section>
+
+<!-- 十一、日常操作指南 -->
+<section id="s11">
+  <h2><span class="num">11</span> 日常操作指南</h2>
+
+  <div class="scenario">
+    <h4>场景 A：在群里快速录入一条梗</h4>
+    <ol>
+      <li>在企微群发截图（可选）</li>
+      <li>@机器人 <code>录入 梗名称 链接</code></li>
+      <li>收到确认回复即成功</li>
+    </ol>
+  </div>
+
+  <div class="scenario">
+    <h4>场景 B：在网页批量管理</h4>
+    <ol>
+      <li>打开 <code>http://21.6.179.196:3000</code></li>
+      <li>点 🔐 登录管理员</li>
+      <li>在「已录入」列表中设置分类、等级、补充概括</li>
+      <li>灰色 = 淘汰，其他等级进入周报</li>
+    </ol>
+  </div>
+
+  <div class="scenario">
+    <h4>场景 C：生成并推送周报</h4>
+    <ol>
+      <li>切到「📊 周报」Tab</li>
+      <li>选择日期范围</li>
+      <li>点「👀 预览周报」确认内容</li>
+      <li>点「📣 推送到企微群」</li>
+      <li>等待推送完成（文字 + 图片 + 腾讯文档同步）</li>
+    </ol>
+  </div>
+
+  <div class="warn">推送过程中请勿关闭页面，等待所有步骤完成后会显示成功提示。</div>
+</section>
+
+<!-- 十二、团队成员 -->
+<section id="s12">
+  <h2><span class="num">12</span> 团队成员</h2>
+  <p>
+    <span class="badge badge-green">aggiezhang</span>
+    <span class="badge badge-blue">chupychu</span>
+    <span class="badge badge-green">evayao</span>
+    <span class="badge badge-blue">hazzelchen</span>
+    <span class="badge badge-green">infpzhang</span>
+    <span class="badge badge-blue">qianaxu</span>
+    <span class="badge badge-green">roarchen</span>
+    <span class="badge badge-blue">shyaoliu</span>
+    <span class="badge badge-green">wenjingyang</span>
+    <span class="badge badge-blue">xintongzou</span>
+    <span class="badge badge-green">yoyopiao</span>
+    <span class="badge badge-blue">zaynnchen</span>
+    <span class="badge badge-green">zialin</span>
+    <span class="badge badge-blue">ziminmeng</span>
+  </p>
+</section>
+
+<div class="footer">
+  本文档由热梗洞察系统生成 · 用户社区组 · 2026-03-27
+</div>
+
+</div>
+</body>
+</html>
