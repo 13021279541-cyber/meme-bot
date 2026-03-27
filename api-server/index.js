@@ -259,8 +259,8 @@ app.post('/screenshot-report', async (req, res) => {
     });
 
     const page = await browser.newPage();
-    // 手机宽度，适合群里查看
-    await page.setViewport({ width: 750, height: 1334, deviceScaleFactor: 2 });
+    // 手机宽度，紧凑截图
+    await page.setViewport({ width: 640, height: 960, deviceScaleFactor: 2 });
     await page.goto(reportUrl, { waitUntil: 'networkidle0', timeout: 30000 });
 
     // 等待报告内容渲染完成
@@ -404,6 +404,94 @@ app.get('/webhook/aibot/health', async (req, res) => {
     res.json(result);
   } catch (e) {
     res.status(503).json({ ok: false, error: 'aibot-client 未运行: ' + e.message });
+  }
+});
+
+// ===== 同步到腾讯文档智能表格 =====
+const https = require('https');
+const TDOC_TOKEN = process.env.TDOC_TOKEN || 'f1e30d2488ad48bb97ebde568900cb8f';
+const SMARTSHEET_FILE_ID = 'JnhTgrmgdZGG';
+const SMARTSHEET_SHEET_ID = 't00i2h';
+
+function callTencentDocMCP(method, params) {
+  const body = JSON.stringify({
+    jsonrpc: '2.0',
+    id: Date.now(),
+    method: 'tools/call',
+    params: { name: method, arguments: params }
+  });
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'docs.qq.com',
+      path: '/openapi/mcp',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': TDOC_TOKEN,
+        'Content-Length': Buffer.byteLength(body)
+      }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { resolve({ error: data }); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+// POST /sync-smartsheet - 把一批梗同步到腾讯文档智能表格
+app.post('/sync-smartsheet', async (req, res) => {
+  try {
+    const { memes, pushPeriod } = req.body;
+    if (!memes || !Array.isArray(memes) || memes.length === 0) {
+      return res.status(400).json({ ok: false, error: '请提供 memes 数组' });
+    }
+
+    const categoryMap = { wangzhe: '🎮 王者相关', 'public': '🌍 大众热点' };
+    const priorityMap = { red: '🔴 必上', orange: '🟠 推荐', blue: '🔵 可选' };
+
+    const records = memes.map(m => {
+      const fv = {
+        '梗名称': [{ text: m.name, type: 'text' }],
+        '分类': [{ text: categoryMap[m.category] || '' }],
+        '来源链接': [{ text: m.name, type: 'url', link: m.source_url || '' }],
+        '一句话概括': [{ text: m.summary || '', type: 'text' }],
+        '录入日期': String(new Date(m.created_at).getTime())
+      };
+      const pri = priorityMap[m.priority];
+      if (pri) fv['等级'] = [{ text: pri }];
+      if (pushPeriod) fv['推送周期'] = [{ text: pushPeriod, type: 'text' }];
+      if (m.official_title || m.official_link) {
+        fv['官号跟进'] = [{ text: [m.official_title, m.official_link].filter(Boolean).join(' '), type: 'text' }];
+      }
+      if (m.incentive_topic || m.incentive_link) {
+        fv['作者激励'] = [{ text: [m.incentive_topic, m.incentive_link].filter(Boolean).join(' '), type: 'text' }];
+      }
+      return { field_values: fv };
+    });
+
+    console.log(`[sync-smartsheet] 同步 ${records.length} 条到智能表格...`);
+    const result = await callTencentDocMCP('smartsheet.add_records', {
+      file_id: SMARTSHEET_FILE_ID,
+      sheet_id: SMARTSHEET_SHEET_ID,
+      records: records
+    });
+
+    if (result.error) {
+      console.error('[sync-smartsheet] 错误:', result.error);
+      return res.json({ ok: false, error: result.error.message || '同步失败' });
+    }
+
+    console.log('[sync-smartsheet] 同步成功');
+    res.json({ ok: true, synced: records.length });
+  } catch (e) {
+    console.error('[sync-smartsheet] 异常:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
   }
 });
 

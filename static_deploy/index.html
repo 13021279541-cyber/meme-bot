@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🔥 热梗录入</title>
-<!-- Supabase JS SDK (CDN) -->
+<!-- Supabase JS SDK (仅图片上传用) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   /* ===== 基础 ===== */
@@ -23,8 +23,7 @@
     color: white;
     padding: 24px 20px;
     text-align: center;
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 100;
     box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
   }
@@ -265,6 +264,24 @@
 
   .meme-item .meme-info { flex: 1; min-width: 0; }
   .meme-item .meme-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: #2d3436; }
+  .meme-item .meme-title-link { color: #2d3436; text-decoration: none; transition: color 0.2s; }
+  .meme-item .meme-title-link:hover { color: #3b82f6; text-decoration: underline; }
+  .meme-item .edit-icon { font-size: 12px; cursor: pointer; opacity: 0.3; transition: opacity 0.2s; }
+  .meme-item .edit-icon:hover { opacity: 1; }
+  .meme-item .editable-name { cursor: pointer; transition: color 0.2s; }
+  .meme-item .editable-name:hover { color: #3b82f6; }
+  .meme-item .meme-link { margin-top: 2px; display: flex; align-items: center; gap: 4px; }
+
+  /* 跟进案例 */
+  .followup-area { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .followup-item { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 6px 10px; background: #f8f9fc; border-radius: 8px; flex-wrap: wrap; }
+  .followup-item.empty { color: #ccc; cursor: pointer; padding: 5px 10px; }
+  .followup-item.empty:hover { color: #888; background: #f0f2f5; }
+  .followup-label { font-weight: 600; color: #555; white-space: nowrap; }
+  .followup-thumb { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; }
+  .followup-text { color: #444; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .followup-link { color: #3b82f6; text-decoration: none; white-space: nowrap; }
+  .followup-link:hover { text-decoration: underline; }
 
   .meme-item .meme-desc {
     font-size: 13px;
@@ -523,8 +540,9 @@
 <body>
 
 <div class="header">
-  <h1>🔥 热梗录入</h1>
-  <p>发现好梗？录下来！</p>
+  <h1>🔥 热梗洞察</h1>
+  <p>用户社区组 · 热梗收集与跟踪</p>
+  <div id="admin-login-btn" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;padding:6px 12px;border-radius:8px;transition:all 0.2s;" onclick="showLoginDialog()">🔐</div>
 </div>
 
 <div class="container">
@@ -613,6 +631,7 @@
 
       <button type="button" class="submit-btn" id="btn-preview-report" style="margin-bottom:10px">👀 预览周报</button>
       <button type="button" class="submit-btn" id="btn-download-report" style="background:linear-gradient(135deg,#43e97b,#38f9d7);box-shadow:0 4px 16px rgba(67,233,123,0.3);display:none">📥 下载 HTML 周报</button>
+      <button type="button" class="submit-btn" id="btn-push-wecom" style="background:linear-gradient(135deg,#3b82f6,#8b5cf6);box-shadow:0 4px 16px rgba(59,130,246,0.3);display:none;margin-top:10px">📣 推送到企微群</button>
     </div>
 
     <div id="report-preview-frame" style="margin-top:20px;display:none">
@@ -649,13 +668,127 @@
   </div>
 </div>
 
+<!-- 管理员登录弹窗 -->
+<div class="confirm-overlay" id="login-overlay">
+  <div class="confirm-dialog" style="max-width:320px">
+    <div class="confirm-icon">🔐</div>
+    <div class="confirm-title">管理员登录</div>
+    <div class="confirm-desc">登录后可录入、编辑、管理热梗</div>
+    <div style="text-align:left;margin-bottom:16px">
+      <input type="text" id="login-user" placeholder="账号" style="width:100%;padding:10px 14px;border:2px solid #eee;border-radius:10px;font-size:14px;margin-bottom:8px;box-sizing:border-box;outline:none;font-family:inherit">
+      <input type="password" id="login-pass" placeholder="密码" style="width:100%;padding:10px 14px;border:2px solid #eee;border-radius:10px;font-size:14px;box-sizing:border-box;outline:none;font-family:inherit" onkeydown="if(event.key==='Enter')doLogin()">
+      <div id="login-error" style="font-size:12px;color:#f5576c;margin-top:6px;display:none">账号或密码错误</div>
+    </div>
+    <div class="confirm-actions">
+      <button class="btn-cancel" onclick="hideLoginDialog()">取消</button>
+      <button class="btn-danger" style="background:linear-gradient(135deg,#667eea,#764ba2)" onclick="doLogin()">登录</button>
+    </div>
+  </div>
+</div>
+
 <script>
-// ===== Supabase 初始化 =====
+// ===== API 配置 =====
+// API 中间层地址（部署到 CVM 后改为内网地址）
+const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:3000'
+  : '';
+
+// Supabase（仅用于图片 Storage 上传，数据走 API）
 const SUPABASE_URL = 'https://iwmvtizwcibusjjiquwq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3bXZ0aXp3Y2lidXNqamlxdXdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MjMxMDUsImV4cCI6MjA4OTk5OTEwNX0.E6dx_ewnrFXgnoMoWsu0Hk27RbByf3w8ztmb6C9XIOM';
 const STORAGE_BUCKET = 'meme-images';
-
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ===== API 辅助函数 =====
+async function apiGet(path) {
+  const res = await fetch(API_BASE + path);
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+  return res.json();
+}
+async function apiPost(path, body) {
+  const res = await fetch(API_BASE + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+  return res.json();
+}
+async function apiPatch(path, body) {
+  const res = await fetch(API_BASE + path, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+  return res.json();
+}
+async function apiDelete(path) {
+  const res = await fetch(API_BASE + path, { method: 'DELETE' });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+  return res.json();
+}
+
+// ===== 管理员登录系统 =====
+const ADMIN_USER = 'memebot';
+const ADMIN_PASS = 'memebot2026';
+let isAdmin = localStorage.getItem('memebot_admin') === 'true';
+
+function showLoginDialog() {
+  document.getElementById('login-overlay').classList.add('show');
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').style.display = 'none';
+  setTimeout(() => document.getElementById('login-user').focus(), 100);
+}
+function hideLoginDialog() {
+  document.getElementById('login-overlay').classList.remove('show');
+}
+function doLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  if (user === ADMIN_USER && pass === ADMIN_PASS) {
+    isAdmin = true;
+    localStorage.setItem('memebot_admin', 'true');
+    hideLoginDialog();
+    applyAdminMode();
+    if (window.showToast) window.showToast('✅ 管理员登录成功', 'success');
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+  }
+}
+function doLogout() {
+  isAdmin = false;
+  localStorage.removeItem('memebot_admin');
+  applyAdminMode();
+  if (window.showToast) window.showToast('已退出管理模式', 'success');
+}
+
+function applyAdminMode() {
+  // Tab 按钮显示/隐藏
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const tab = btn.dataset.tab;
+    if (tab === 'submit' || tab === 'trash' || tab === 'report') {
+      btn.style.display = isAdmin ? '' : 'none';
+    }
+  });
+  // 如果当前在管理员 Tab 但退出了管理模式，切回已录入列表
+  if (!isAdmin) {
+    const activeTab = document.querySelector('.tab-btn.active');
+    if (activeTab && ['submit','trash','report'].includes(activeTab.dataset.tab)) {
+      document.querySelector('.tab-btn[data-tab="list"]').click();
+    }
+  }
+  // 登录按钮变成退出按钮
+  const loginBtn = document.getElementById('admin-login-btn');
+  if (isAdmin) {
+    loginBtn.innerHTML = '👋 退出管理';
+    loginBtn.style.color = 'rgba(255,255,255,0.8)';
+    loginBtn.style.background = 'rgba(255,255,255,0.15)';
+    loginBtn.onclick = doLogout;
+  } else {
+    loginBtn.innerHTML = '🔐';
+    loginBtn.style.color = 'rgba(255,255,255,0.5)';
+    loginBtn.style.background = 'transparent';
+    loginBtn.onclick = showLoginDialog;
+  }
+  // 刷新列表（显示/隐藏编辑控件）
+  if (document.querySelector('.tab-btn[data-tab="list"].active') && window.loadMemes) {
+    window.loadMemes();
+  }
+}
 
 // 企微 Webhook URL（配置后取消注释）
 const WEBHOOK_URL = '';
@@ -699,6 +832,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     t.className = 'toast ' + type + ' show';
     setTimeout(() => t.classList.remove('show'), 2500);
   }
+  window.showToast = showToast;
 
   // ===== 图片上传预览 =====
   const uploadArea = document.getElementById('upload-area');
@@ -813,26 +947,15 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       // 1. 上传图片到 Supabase Storage
       const imageUrl = await uploadImageToSupabase(imageFile);
 
-      // 2. 插入记录到 Supabase
-      const now = new Date();
-      const isoWeek = getISOWeek(now);
-
+      // 2. 通过 API 插入记录
       const meme = {
-        id: Math.random().toString(36).substr(2, 8),
         name: name,
-        summary: '',
         source_url: sourceUrl,
-        contributor: '',
         category: catInput.value,
-        priority: '',
         image_path: imageUrl,
-        created_at: now.toISOString(),
-        week_number: isoWeek,
-        year: now.getFullYear(),
       };
 
-      const { error } = await sb.from('memes').insert(meme);
-      if (error) throw new Error(error.message);
+      await apiPost('/memes', meme);
 
       // 3. Webhook 通知
       sendWebhook(name);
@@ -868,11 +991,13 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   async function loadMemes() {
     const container = document.getElementById('meme-list-container');
     try {
-      const { data: memes, error } = await sb.from('memes').select('*').is('deleted_at', null).order('created_at', { ascending: false });
-      if (error) throw error;
+      const allMemes = await apiGet('/memes');
+
+      // 非管理员模式过滤灰色梗
+      const memes = isAdmin ? allMemes : (allMemes || []).filter(m => m.priority !== 'gray');
 
       if (!memes || memes.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-icon">🫥</div><p>还没有热梗，快去录入第一个！</p></div>';
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">🫥</div><p>' + (isAdmin ? '还没有热梗，快去录入第一个！' : '暂无热梗') + '</p></div>';
         return;
       }
 
@@ -889,57 +1014,133 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
         var imgSrc = m.image_path && m.image_path.startsWith('http') ? m.image_path : '';
 
         html += '<li class="meme-item" data-id="' + m.id + '">';
-        // 可点击更换截图的图片区
-        html += '<div class="thumb-wrapper" data-id="' + m.id + '" title="点击更换截图">';
+        // 图片区：管理员可点击更换，普通用户只看
+        if (isAdmin) {
+          html += '<div class="thumb-wrapper" data-id="' + m.id + '" title="点击更换截图">';
+        } else {
+          html += '<div class="thumb-wrapper">';
+        }
         if (imgSrc) {
           html += '<img class="meme-thumb" src="' + imgSrc + '" alt="">';
         } else {
           html += '<div class="meme-thumb-placeholder">' + emoji + '</div>';
         }
-        html += '<div class="thumb-overlay">📷</div>';
+        if (isAdmin) html += '<div class="thumb-overlay">📷</div>';
         html += '</div>';
         html += '<div class="meme-info">';
-        html += '<div class="meme-title">' + escapeHtml(m.name) + '</div>';
-        if (hasSummary) {
-          html += '<div class="meme-desc" data-id="' + m.id + '" title="点击修改概括">' + escapeHtml(m.summary) + '</div>';
+        // 梗名称：管理员可编辑
+        if (isAdmin) {
+          html += '<div class="meme-title"><span class="editable-name" data-id="' + m.id + '" title="点击修改名称">' + escapeHtml(m.name) + '</span> <span class="edit-icon" data-id="' + m.id + '" data-field="name" title="编辑名称">✏️</span></div>';
         } else {
+          html += '<div class="meme-title">' + (m.source_url ? '<a href="' + escapeHtml(m.source_url) + '" target="_blank" class="meme-title-link">' + escapeHtml(m.name) + '</a>' : escapeHtml(m.name)) + '</div>';
+        }
+        // 来源链接：管理员可编辑
+        if (isAdmin) {
+          if (m.source_url) {
+            html += '<div class="meme-link" data-id="' + m.id + '" title="点击修改链接"><a href="' + escapeHtml(m.source_url) + '" target="_blank" onclick="event.stopPropagation()" style="font-size:12px;color:#3b82f6;text-decoration:none;">🔗 ' + escapeHtml(m.source_url).substring(0, 40) + (m.source_url.length > 40 ? '...' : '') + '</a> <span class="edit-icon" data-field="source_url" title="编辑链接">✏️</span></div>';
+          } else {
+            html += '<div class="meme-link empty" data-id="' + m.id + '" style="font-size:12px;color:#ccc;cursor:pointer;">+ 添加来源链接</div>';
+          }
+        }
+        if (hasSummary) {
+          if (isAdmin) {
+            html += '<div class="meme-desc" data-id="' + m.id + '" title="点击修改概括">' + escapeHtml(m.summary) + '</div>';
+          } else {
+            html += '<div class="meme-desc" style="cursor:default">' + escapeHtml(m.summary) + '</div>';
+          }
+        } else if (isAdmin) {
           html += '<div class="meme-desc empty" data-id="' + m.id + '">+ 点击补录概括</div>';
         }
 
         html += '<div class="meme-tags">';
         if (cat === 'wangzhe') {
-          html += '<span class="tag-btn cat-wangzhe" data-id="' + m.id + '" data-field="category">🎮 王者相关</span>';
+          html += '<span class="tag-btn cat-wangzhe"' + (isAdmin ? ' data-id="' + m.id + '" data-field="category"' : '') + '>🎮 王者相关</span>';
         } else if (cat === 'public') {
-          html += '<span class="tag-btn cat-public" data-id="' + m.id + '" data-field="category">🔥 大众热点</span>';
-        } else {
+          html += '<span class="tag-btn cat-public"' + (isAdmin ? ' data-id="' + m.id + '" data-field="category"' : '') + '>🔥 大众热点</span>';
+        } else if (isAdmin) {
           html += '<span class="tag-btn cat-none" data-id="' + m.id + '" data-field="category">📌 点击分类</span>';
         }
 
-        html += '<div class="priority-dots" data-id="' + m.id + '">';
-        ['red','orange','blue','gray'].forEach(c => {
-          html += '<span class="priority-dot dot-' + c + (pri === c ? ' active' : '') + '" data-priority="' + c + '" title="' +
-            ({red:'🔴 必上',orange:'🟠 推荐',blue:'🔵 可选',gray:'⚪ 不上报'}[c]) + '"></span>';
-        });
-        html += '</div></div>';
+        if (isAdmin) {
+          html += '<div class="priority-dots" data-id="' + m.id + '">';
+          ['red','orange','blue','gray'].forEach(c => {
+            html += '<span class="priority-dot dot-' + c + (pri === c ? ' active' : '') + '" data-priority="' + c + '" title="' +
+              ({red:'🔴 必上',orange:'🟠 推荐',blue:'🔵 可选',gray:'⚪ 不上报'}[c]) + '"></span>';
+          });
+          html += '</div>';
+        } else if (pri) {
+          const priLabel = {red:'🔴 必上',orange:'🟠 推荐',blue:'🔵 可选'}[pri] || '';
+          if (priLabel) html += '<span class="tag-btn" style="cursor:default;font-size:11px">' + priLabel + '</span>';
+        }
+        html += '</div>';
+
+        // ===== 跟进案例区域 =====
+        const hasOfficial = m.official_title || m.official_link || m.official_image;
+        const hasIncentive = m.incentive_topic || m.incentive_link;
+
+        if (hasOfficial || hasIncentive || isAdmin) {
+          html += '<div class="followup-area">';
+
+          // 官号跟进
+          if (hasOfficial) {
+            html += '<div class="followup-item official">';
+            html += '<span class="followup-label">📢 官号跟进</span>';
+            if (m.official_image) html += '<img src="' + escapeHtml(m.official_image) + '" class="followup-thumb" alt="">';
+            if (m.official_title) html += '<span class="followup-text">' + escapeHtml(m.official_title) + '</span>';
+            if (m.official_link) html += '<a href="' + escapeHtml(m.official_link) + '" target="_blank" class="followup-link" onclick="event.stopPropagation()">查看 →</a>';
+            if (isAdmin) html += '<span class="edit-icon followup-edit" data-id="' + m.id + '" data-type="official" title="编辑官号跟进">✏️</span>';
+            html += '</div>';
+          } else if (isAdmin) {
+            html += '<div class="followup-item empty followup-add" data-id="' + m.id + '" data-type="official">+ 添加官号跟进</div>';
+          }
+
+          // 作者激励
+          if (hasIncentive) {
+            html += '<div class="followup-item incentive">';
+            html += '<span class="followup-label">🎯 作者激励</span>';
+            if (m.incentive_topic) html += '<span class="followup-text">' + escapeHtml(m.incentive_topic) + '</span>';
+            if (m.incentive_link) html += '<a href="' + escapeHtml(m.incentive_link) + '" target="_blank" class="followup-link" onclick="event.stopPropagation()">优质作品 →</a>';
+            if (isAdmin) html += '<span class="edit-icon followup-edit" data-id="' + m.id + '" data-type="incentive" title="编辑作者激励">✏️</span>';
+            html += '</div>';
+          } else if (isAdmin) {
+            html += '<div class="followup-item empty followup-add" data-id="' + m.id + '" data-type="incentive">+ 添加作者激励</div>';
+          }
+
+          html += '</div>';
+        }
+
         html += '<div class="meme-meta">' + dateStr + '</div>';
         html += '</div>';
-        // 删除按钮
-        html += '<button class="delete-btn" data-id="' + m.id + '" data-name="' + escapeHtml(m.name) + '" title="删除">🗑️</button>';
+        // 删除按钮（仅管理员）
+        if (isAdmin) {
+          html += '<button class="delete-btn" data-id="' + m.id + '" data-name="' + escapeHtml(m.name) + '" title="删除">🗑️</button>';
+        }
         html += '</li>';
       });
       html += '</ul>';
       container.innerHTML = html;
 
-      // 绑定事件
-      container.querySelectorAll('.meme-desc').forEach(el => { el.addEventListener('click', function() { startEditSummary(this); }); });
-      container.querySelectorAll('.tag-btn[data-field="category"]').forEach(el => { el.addEventListener('click', function() { toggleCategory(this); }); });
-      container.querySelectorAll('.priority-dot').forEach(el => { el.addEventListener('click', function() { setPriority(this); }); });
-      container.querySelectorAll('.delete-btn').forEach(el => { el.addEventListener('click', function() { confirmDeleteMeme(this.dataset.id, this.dataset.name); }); });
-      container.querySelectorAll('.thumb-wrapper').forEach(el => { el.addEventListener('click', function() { startChangeImage(this.dataset.id); }); });
+      // 绑定事件（仅管理员）
+      if (isAdmin) {
+        container.querySelectorAll('.meme-desc[data-id]').forEach(el => { el.addEventListener('click', function() { startEditSummary(this); }); });
+        container.querySelectorAll('.tag-btn[data-field="category"]').forEach(el => { el.addEventListener('click', function() { toggleCategory(this); }); });
+        container.querySelectorAll('.priority-dot').forEach(el => { el.addEventListener('click', function() { setPriority(this); }); });
+        container.querySelectorAll('.delete-btn').forEach(el => { el.addEventListener('click', function() { confirmDeleteMeme(this.dataset.id, this.dataset.name); }); });
+        container.querySelectorAll('.thumb-wrapper[data-id]').forEach(el => { el.addEventListener('click', function() { startChangeImage(this.dataset.id); }); });
+        // 编辑名称
+        container.querySelectorAll('.editable-name').forEach(el => { el.addEventListener('click', function() { startEditField(this.dataset.id, 'name', this.textContent); }); });
+        container.querySelectorAll('.edit-icon[data-field="name"]').forEach(el => { el.addEventListener('click', function() { var nameEl = this.parentElement.querySelector('.editable-name'); startEditField(nameEl.dataset.id, 'name', nameEl.textContent); }); });
+        // 编辑链接
+        container.querySelectorAll('.meme-link[data-id]').forEach(el => { el.addEventListener('click', function(e) { if (e.target.tagName === 'A') return; startEditField(this.dataset.id, 'source_url', this.querySelector('a') ? this.querySelector('a').href : ''); }); });
+        container.querySelectorAll('.edit-icon[data-field="source_url"]').forEach(el => { el.addEventListener('click', function(e) { e.stopPropagation(); var linkEl = this.closest('.meme-link'); startEditField(linkEl.dataset.id, 'source_url', linkEl.querySelector('a') ? linkEl.querySelector('a').href : ''); }); });
+        // 跟进案例编辑
+        container.querySelectorAll('.followup-add, .followup-edit').forEach(el => { el.addEventListener('click', function(e) { e.stopPropagation(); editFollowup(this.dataset.id || this.closest('[data-id]').dataset.id, this.dataset.type); }); });
+      }
     } catch (err) {
       container.innerHTML = '<div class="empty-state"><p>加载失败，请刷新重试</p></div>';
     }
   }
+  window.loadMemes = loadMemes;
 
   // ===== 分类切换 =====
   async function toggleCategory(el) {
@@ -949,8 +1150,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     let newCat = !currentCat ? 'wangzhe' : currentCat === 'wangzhe' ? 'public' : 'wangzhe';
 
     try {
-      const { error } = await sb.from('memes').update({ category: newCat }).eq('id', memeId);
-      if (error) throw error;
+      await apiPatch('/memes/' + memeId, { category: newCat });
       loadMemes();
     } catch (err) { showToast('更新失败', 'error'); }
   }
@@ -961,13 +1161,63 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     const newPri = el.dataset.priority;
 
     try {
-      const { error } = await sb.from('memes').update({ priority: newPri }).eq('id', memeId);
-      if (error) throw error;
+      await apiPatch('/memes/' + memeId, { priority: newPri });
       loadMemes();
     } catch (err) { showToast('更新失败', 'error'); }
   }
 
   // ===== 行内编辑补录概括 =====
+  // ===== 跟进案例编辑 =====
+  function editFollowup(memeId, type) {
+    if (type === 'official') {
+      const title = prompt('官号跟进 - 标题文案：', '');
+      if (title === null) return;
+      const link = prompt('官号跟进 - 跳转链接：', '');
+      if (link === null) return;
+      const imgUrl = prompt('官号跟进 - 图片链接（留空跳过）：', '');
+      if (imgUrl === null) return;
+      (async function() {
+        try {
+          const update = { official_title: title.trim(), official_link: link.trim() };
+          if (imgUrl && imgUrl.trim()) update.official_image = imgUrl.trim();
+          await apiPatch('/memes/' + memeId, update);
+          showToast('官号跟进已保存', 'success');
+          loadMemes();
+        } catch (err) { showToast('保存失败', 'error'); }
+      })();
+    } else if (type === 'incentive') {
+      const topic = prompt('作者激励 - 话题词（如 #雪山救狐#）：', '');
+      if (topic === null) return;
+      const link = prompt('作者激励 - 优质作品链接：', '');
+      if (link === null) return;
+      (async function() {
+        try {
+          await apiPatch('/memes/' + memeId, { incentive_topic: topic.trim(), incentive_link: link.trim() });
+          showToast('作者激励已保存', 'success');
+          loadMemes();
+        } catch (err) { showToast('保存失败', 'error'); }
+      })();
+    }
+  }
+
+  // ===== 通用字段编辑（名称/链接） =====
+  function startEditField(memeId, field, currentValue) {
+    const labels = { name: '梗名称', source_url: '来源链接' };
+    const placeholders = { name: '输入梗名称', source_url: '输入来源链接（抖音/B站/小红书等）' };
+    const newValue = prompt('修改' + labels[field], currentValue || '');
+    if (newValue === null) return; // 取消
+    if (field === 'name' && !newValue.trim()) { showToast('名称不能为空', 'error'); return; }
+    (async function() {
+      try {
+        const updateData = {};
+        updateData[field] = newValue.trim();
+        await apiPatch('/memes/' + memeId, updateData);
+        showToast(labels[field] + '已更新', 'success');
+        loadMemes();
+      } catch (err) { showToast('更新失败', 'error'); }
+    })();
+  }
+
   function startEditSummary(el) {
     const memeId = el.dataset.id;
     const currentText = el.classList.contains('empty') ? '' : el.textContent;
@@ -991,8 +1241,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       const newSummary = input.value.trim();
       if (!newSummary) { showToast('概括不能为空', 'error'); return; }
       try {
-        const { error } = await sb.from('memes').update({ summary: newSummary }).eq('id', memeId);
-        if (error) throw error;
+        await apiPatch('/memes/' + memeId, { summary: newSummary });
         showToast('概括已更新', 'success');
         loadMemes();
       } catch (err) { showToast('更新失败', 'error'); }
@@ -1047,9 +1296,8 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       const { data: urlData } = sb.storage.from('meme-images').getPublicUrl(filePath);
       const publicUrl = urlData.publicUrl;
 
-      // 更新数据库
-      const { error: updateErr } = await sb.from('memes').update({ image_path: publicUrl }).eq('id', memeId);
-      if (updateErr) throw updateErr;
+      // 更新数据库（通过 API）
+      await apiPatch('/memes/' + memeId, { image_path: publicUrl });
 
       showToast('截图已更新', 'success');
       loadMemes();
@@ -1102,8 +1350,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       okClass: 'btn-danger',
       onConfirm: async function() {
         try {
-          const { error } = await sb.from('memes').update({ deleted_at: new Date().toISOString() }).eq('id', memeId);
-          if (error) throw error;
+          await apiDelete('/memes/' + memeId);
           showToast('已移入回收站', 'success');
           loadMemes();
           refreshCount();
@@ -1119,8 +1366,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   async function loadTrash() {
     const container = document.getElementById('trash-list-container');
     try {
-      const { data: memes, error } = await sb.from('memes').select('*').not('deleted_at', 'is', null).order('deleted_at', { ascending: false });
-      if (error) throw error;
+      const memes = await apiGet('/deleted');
 
       if (!memes || memes.length === 0) {
         container.innerHTML = '<div class="empty-state"><div class="empty-icon">✨</div><p>回收站是空的，干干净净！</p></div>';
@@ -1179,8 +1425,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   // ===== 恢复 =====
   async function restoreMeme(memeId) {
     try {
-      const { error } = await sb.from('memes').update({ deleted_at: null }).eq('id', memeId);
-      if (error) throw error;
+      await apiPost('/memes/' + memeId + '/restore', {});
       showToast('✅ 已恢复', 'success');
       loadTrash();
       refreshCount();
@@ -1200,8 +1445,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       okClass: 'btn-danger',
       onConfirm: async function() {
         try {
-          const { error } = await sb.from('memes').delete().eq('id', memeId);
-          if (error) throw error;
+          await apiDelete('/memes/' + memeId + '/permanent');
           showToast('已永久删除', 'success');
           loadTrash();
           refreshTrashCount();
@@ -1215,9 +1459,10 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   // ===== 回收站计数 =====
   async function refreshTrashCount() {
     try {
-      const { count, error } = await sb.from('memes').select('*', { count: 'exact', head: true }).not('deleted_at', 'is', null);
+      const items = await apiGet('/deleted');
+      const count = items.length;
       const span = document.getElementById('trash-count');
-      if (!error && count > 0) span.textContent = '(' + count + ')';
+      if (count > 0) span.textContent = '(' + count + ')';
       else span.textContent = '';
     } catch(e) {}
   }
@@ -1318,6 +1563,8 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   .meme-card .no-image { width: 100%; height: 520px; background: linear-gradient(135deg, #f8f9fc 0%, #eef1f8 100%); display: flex; align-items: center; justify-content: center; font-size: 80px; flex-shrink: 0; }
   .meme-card .card-body { padding: 20px 22px; display: flex; flex-direction: column; flex: 1; min-height: 0; }
   .meme-card .meme-name { font-size: 24px; font-weight: 800; color: #1a1a2e; margin-bottom: 10px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .meme-card .meme-name-link { color: #1a1a2e; text-decoration: none; transition: color 0.2s; }
+  .meme-card .meme-name-link:hover { color: #3b82f6; text-decoration: underline; }
   .meme-card .meme-summary { font-size: 15px; color: #666; line-height: 1.55; flex: 1; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .meme-card .card-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; margin-top: 10px; border-top: 1px solid #f0f2f5; }
   .meme-card .source-link { font-size: 12px; color: #667eea; text-decoration: none; padding: 4px 10px; background: rgba(102,126,234,0.08); border-radius: 20px; }
@@ -1372,12 +1619,33 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
         }
 
         html += `<div class="card-body">
-        <div class="meme-name">${escapeHtml(meme.name)}</div>
-        <div class="meme-summary">${escapeHtml(meme.summary || '')}</div>
-        <div class="card-footer">`;
+        <div class="meme-name">${meme.source_url ? `<a href="${escapeHtml(meme.source_url)}" target="_blank" class="meme-name-link">${escapeHtml(meme.name)}</a>` : escapeHtml(meme.name)}</div>
+        <div class="meme-summary">${escapeHtml(meme.summary || '')}</div>`;
+
+        // 跟进案例
+        if (meme.official_title || meme.official_link || meme.incentive_topic || meme.incentive_link) {
+          html += `<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #eee;font-size:12px">`;
+          if (meme.official_title || meme.official_link) {
+            html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">`;
+            html += `<span style="background:#e8f4fd;color:#1a73e8;padding:1px 8px;border-radius:6px;font-weight:600;white-space:nowrap">📢 官号跟进</span>`;
+            if (meme.official_title) html += `<span style="color:#444">${escapeHtml(meme.official_title)}</span>`;
+            if (meme.official_link) html += `<a href="${escapeHtml(meme.official_link)}" target="_blank" style="color:#3b82f6;text-decoration:none;white-space:nowrap">查看 →</a>`;
+            html += `</div>`;
+          }
+          if (meme.incentive_topic || meme.incentive_link) {
+            html += `<div style="display:flex;align-items:center;gap:6px">`;
+            html += `<span style="background:#fef3e2;color:#e67e22;padding:1px 8px;border-radius:6px;font-weight:600;white-space:nowrap">🎯 作者激励</span>`;
+            if (meme.incentive_topic) html += `<span style="color:#444">${escapeHtml(meme.incentive_topic)}</span>`;
+            if (meme.incentive_link) html += `<a href="${escapeHtml(meme.incentive_link)}" target="_blank" style="color:#3b82f6;text-decoration:none;white-space:nowrap">优质作品 →</a>`;
+            html += `</div>`;
+          }
+          html += `</div>`;
+        }
+
+        html += `<div class="card-footer">`;
 
         if (meme.source_url) {
-          html += `<a class="source-link" href="${escapeHtml(meme.source_url)}" target="_blank">🔗 来源</a>`;
+          html += `<a class="source-link" href="${escapeHtml(meme.source_url)}" target="_blank">🔗 跳转视频</a>`;
         }
 
         html += `<span class="date-tag">${dateDisplay}</span>
@@ -1403,16 +1671,10 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     this.textContent = '⏳ 生成中...';
 
     try {
-      // 从 Supabase 查询
-      const startDt = startDate + 'T00:00:00';
-      const endDt = endDate + 'T23:59:59';
-      const { data: memes, error } = await sb.from('memes').select('*')
-        .is('deleted_at', null)
-        .gte('created_at', startDt)
-        .lte('created_at', endDt)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      // 从 API 查询
+      const startDt = startDate;
+      const endDt = endDate;
+      const memes = await apiGet('/memes?start_date=' + startDt + '&end_date=' + endDt);
 
       // 过滤灰色
       const filtered = (memes || []).filter(m => m.priority !== 'gray');
@@ -1492,6 +1754,10 @@ window.addEventListener('load', function() {
       }, 30000);
 
       document.getElementById('btn-download-report').style.display = 'block';
+      document.getElementById('btn-push-wecom').style.display = 'block';
+      window._lastReportMemes = filtered;
+      window._lastReportStart = startDate;
+      window._lastReportEnd = endDate;
       showToast('✅ 周报已生成', 'success');
     } catch (err) {
       showToast('❌ ' + (err.message || '生成失败'), 'error');
@@ -1518,11 +1784,78 @@ window.addEventListener('load', function() {
     showToast('📥 下载已开始', 'success');
   });
 
+  // ===== 推送到企微智能机器人（服务端自动截图推送）=====
+
+  document.getElementById('btn-push-wecom').addEventListener('click', async function() {
+    const memes = window._lastReportMemes;
+    if (!memes || memes.length === 0) { showToast('请先预览周报', 'error'); return; }
+
+    const startDate = window._lastReportStart;
+    const endDate = window._lastReportEnd;
+
+    if (!confirm('确认推送 ' + memes.length + ' 条热梗到企微群？')) return;
+
+    this.disabled = true;
+    this.style.opacity = '0.7';
+    this.textContent = '⏳ 推送中...';
+
+    try {
+      // ===== 第一条：markdown 文字版（精简清单） =====
+      var mdLines = ['**🔥 热梗洞察周报** | ' + startDate + ' ~ ' + endDate, ''];
+      memes.forEach(function(m, i) {
+        var line = (i + 1) + '. **' + m.name + '**';
+        if (m.source_url) line += '  [视频](' + m.source_url + ')';
+        if (m.summary) line += '\n   > ' + m.summary;
+        if (m.official_title || m.official_link) {
+          line += '\n   > 官号跟进：' + (m.official_title || '') + (m.official_link ? '  [查看](' + m.official_link + ')' : '');
+        }
+        if (m.incentive_topic || m.incentive_link) {
+          line += '\n   > 作者激励：' + (m.incentive_topic || '') + (m.incentive_link ? '  [查看](' + m.incentive_link + ')' : '');
+        }
+        mdLines.push(line);
+      });
+      mdLines.push('');
+      var docUrl = 'https://docs.qq.com/smartsheet/DSm5oVGdybWdkWkdH';
+      mdLines.push('共 ' + memes.length + ' 条 | [查看完整报告](' + docUrl + ')');
+
+      await apiPost('/webhook/wecom', { msgtype: 'markdown', content: mdLines.join('\n'), chatid: 'wrkSFfCgAA_4ywmlvYyZmOXzc5qjTzRA' });
+
+      // ===== 稍等后发第二条：截图图片 =====
+      await new Promise(function(resolve) { setTimeout(resolve, 800); });
+
+      var shotRes = await fetch('/screenshot-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate, endDate, chatid: 'wrkSFfCgAA_4ywmlvYyZmOXzc5qjTzRA' })
+      });
+      var shotData = await shotRes.json();
+      if (!shotData.ok) throw new Error(shotData.error || '截图推送失败');
+
+      // ===== 第三步：同步到腾讯文档智能表格 =====
+      try {
+        await fetch('/sync-smartsheet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ memes: memes, pushPeriod: startDate + '~' + endDate })
+        });
+      } catch (syncErr) { console.warn('智能表格同步失败（不影响推送）:', syncErr); }
+
+      showToast('📣 已推送到企微群！', 'success');
+    } catch (err) {
+      showToast('❌ 推送失败: ' + (err.message || '网络错误'), 'error');
+    } finally {
+      this.disabled = false;
+      this.style.opacity = '1';
+      this.textContent = '📣 推送到企微群';
+    }
+  });
+
   async function refreshCount() {
     try {
-      const { count, error } = await sb.from('memes').select('*', { count: 'exact', head: true }).is('deleted_at', null);
+      const items = await apiGet('/memes');
+      const count = items.length;
       const span = document.getElementById('meme-count');
-      if (!error && count > 0) span.textContent = '(' + count + ')';
+      if (count > 0) span.textContent = '(' + count + ')';
       else span.textContent = '';
     } catch(e) {}
   }
@@ -1537,6 +1870,126 @@ window.addEventListener('load', function() {
   // 初始化
   refreshCount();
   refreshTrashCount();
+
+  // 管理员模式初始化
+  applyAdminMode();
+
+  // 检查 URL 参数：?report=2026-03-17_2026-03-26 自动展示周报
+  const urlParams = new URLSearchParams(window.location.search);
+  const reportParam = urlParams.get('report');
+  if (reportParam) {
+    // 周报模式：隐藏所有 Tab，全屏展示周报
+    const [rStart, rEnd] = reportParam.split('_');
+    if (rStart && rEnd) {
+      // 隐藏常规 UI
+      document.querySelector('.header').style.display = 'none';
+      document.querySelector('.tabs').style.display = 'none';
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      // 清除截图时的多余边距
+      document.body.style.margin = '0';
+      document.body.style.padding = '0';
+      document.body.style.background = '#f5f6fa';
+      document.querySelector('.container').style.padding = '0';
+      document.querySelector('.container').style.maxWidth = 'none';
+
+      // 创建周报展示容器
+      const reportView = document.createElement('div');
+      reportView.id = 'report-fullview';
+      reportView.innerHTML = '<div style="text-align:center;padding:40px 20px"><div class="spinner"></div><p style="margin-top:12px;color:#999">加载周报中...</p></div>';
+      document.querySelector('.container').appendChild(reportView);
+
+      // 加载数据并渲染
+      (async function() {
+        try {
+          const memes = await apiGet('/memes?start_date=' + rStart + '&end_date=' + rEnd);
+
+          const filtered = (memes || []).filter(m => m.priority !== 'gray');
+          if (filtered.length === 0) {
+            reportView.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#999"><p>该时间范围内没有热梗</p></div>';
+            return;
+          }
+
+          const priorityOrder = { red: 0, orange: 1, blue: 2, '': 3 };
+          filtered.sort((a, b) => (priorityOrder[a.priority || ''] || 3) - (priorityOrder[b.priority || ''] || 3));
+
+          // 渲染周报列表
+          const priorityLabel = { red: '🔴 必上', orange: '🟠 推荐', blue: '🔵 可选' };
+          const categoryLabel = { wangzhe: '🎮 王者', public: '🌍 大众' };
+          const wangzheCount = filtered.filter(m => m.category === 'wangzhe').length;
+          const publicCount = filtered.filter(m => m.category === 'public').length;
+
+          let html = '<div style="max-width:640px;margin:0 auto;padding:6px 8px">';
+          // 头部 - 更紧凑
+          html += '<div style="background:linear-gradient(135deg,#667eea,#764ba2);border-radius:10px;padding:14px 16px;text-align:center;color:white;margin-bottom:6px">';
+          html += '<div style="font-size:20px;font-weight:800;margin-bottom:4px">🔥 热梗洞察周报</div>';
+          html += '<div style="font-size:12px;opacity:0.85">' + rStart + ' ~ ' + rEnd + '</div>';
+          html += '<div style="margin-top:6px;display:flex;justify-content:center;gap:6px;flex-wrap:wrap">';
+          html += '<span style="background:rgba(255,255,255,0.2);border-radius:10px;padding:1px 8px;font-size:10px">🎮 ' + wangzheCount + '</span>';
+          html += '<span style="background:rgba(255,255,255,0.2);border-radius:10px;padding:1px 8px;font-size:10px">🌍 ' + publicCount + '</span>';
+          html += '<span style="background:rgba(255,255,255,0.2);border-radius:10px;padding:1px 8px;font-size:10px">共 ' + filtered.length + '</span>';
+          html += '</div>';
+          html += '</div>';
+
+          // 热梗卡片列表 - 更紧凑
+          filtered.forEach((m, i) => {
+            const imgSrc = m.image_path && m.image_path.startsWith('http') ? m.image_path : '';
+            const pri = priorityLabel[m.priority || ''] || '';
+            const cat = categoryLabel[m.category || ''] || '';
+            const summary = m.summary || '';
+
+            html += '<div style="background:white;border-radius:8px;margin-bottom:5px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.04);display:flex;min-height:64px">';
+            // 左侧图片 - 缩小
+            if (imgSrc) {
+              html += '<div style="width:72px;min-height:64px;flex-shrink:0">';
+              html += '<img src="' + imgSrc + '" style="width:100%;height:100%;object-fit:cover;display:block">';
+              html += '</div>';
+            }
+            // 右侧内容 - 更紧凑
+            html += '<div style="padding:6px 8px;flex:1;min-width:0">';
+            html += '<div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:3px">';
+            if (pri) html += '<span style="font-size:10px;background:#fef3f2;color:#e74c3c;padding:0 6px;border-radius:6px;line-height:18px">' + pri + '</span>';
+            if (cat) html += '<span style="font-size:10px;background:#f0f4ff;color:#3b82f6;padding:0 6px;border-radius:6px;line-height:18px">' + cat + '</span>';
+            html += '</div>';
+            if (m.source_url) {
+              html += '<a href="' + escapeHtml(m.source_url) + '" target="_blank" style="font-size:14px;font-weight:700;color:#2d3436;text-decoration:none;line-height:1.3;display:block;margin-bottom:2px">' + escapeHtml(m.name) + '</a>';
+            } else {
+              html += '<div style="font-size:14px;font-weight:700;color:#2d3436;margin-bottom:2px">' + escapeHtml(m.name) + '</div>';
+            }
+            if (summary) html += '<div style="font-size:11px;color:#888;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">' + escapeHtml(summary) + '</div>';
+
+            // 跟进案例 - 更紧凑
+            if (m.official_title || m.official_link || m.incentive_topic || m.incentive_link) {
+              html += '<div style="margin-top:4px;padding-top:4px;border-top:1px dashed #eee;font-size:10px">';
+              if (m.official_title || m.official_link) {
+                html += '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;flex-wrap:wrap">';
+                html += '<span style="background:#e8f4fd;color:#1a73e8;padding:0 5px;border-radius:3px;font-weight:600">📢 官号</span>';
+                if (m.official_title) html += '<span style="color:#444">' + escapeHtml(m.official_title) + '</span>';
+                if (m.official_link) html += '<a href="' + escapeHtml(m.official_link) + '" target="_blank" style="color:#3b82f6;text-decoration:none">→</a>';
+                html += '</div>';
+              }
+              if (m.incentive_topic || m.incentive_link) {
+                html += '<div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap">';
+                html += '<span style="background:#fef3e2;color:#e67e22;padding:0 5px;border-radius:3px;font-weight:600">🎯 激励</span>';
+                if (m.incentive_topic) html += '<span style="color:#444">' + escapeHtml(m.incentive_topic) + '</span>';
+                if (m.incentive_link) html += '<a href="' + escapeHtml(m.incentive_link) + '" target="_blank" style="color:#3b82f6;text-decoration:none">→</a>';
+                html += '</div>';
+              }
+              html += '</div>';
+            }
+
+            html += '</div></div>';
+          });
+
+          html += '</div>';
+          reportView.innerHTML = html;
+        } catch (err) {
+          reportView.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#f5576c"><p>加载失败：' + (err.message || '未知错误') + '</p></div>';
+        }
+      })();
+    }
+  } else if (!isAdmin) {
+    document.querySelector('.tab-btn[data-tab="list"]').click();
+  }
 })();
 </script>
 </body>
