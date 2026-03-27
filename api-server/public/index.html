@@ -1784,7 +1784,7 @@ window.addEventListener('load', function() {
     showToast('📥 下载已开始', 'success');
   });
 
-  // ===== 推送到企微群（通过 API 代理）=====
+  // ===== 推送到企微智能机器人（服务端自动截图推送）=====
 
   document.getElementById('btn-push-wecom').addEventListener('click', async function() {
     const memes = window._lastReportMemes;
@@ -1793,49 +1793,57 @@ window.addEventListener('load', function() {
     const startDate = window._lastReportStart;
     const endDate = window._lastReportEnd;
 
-    // 确认弹窗
     if (!confirm('确认推送 ' + memes.length + ' 条热梗到企微群？')) return;
 
     this.disabled = true;
+    this.style.opacity = '0.7';
     this.textContent = '⏳ 推送中...';
 
     try {
-      // 周报链接
-      const reportUrl = 'https://pvp.qq.com/cp/a20260325memebot/?report=' + startDate + '_' + endDate;
+      const reportUrl = location.origin + '/?report=' + startDate + '_' + endDate;
 
-      // 找第一个有图片的热梗作为封面
-      const coverMeme = memes.find(m => m.image_path && m.image_path.startsWith('http'));
-      const picurl = coverMeme ? coverMeme.image_path : '';
-
-      // 描述：罗列热点名称，有跟进的加标记
-      const descLines = memes.map((m, i) => {
-        let line = (i + 1) + '. ' + m.name;
-        const tags = [];
-        if (m.official_title || m.official_link) tags.push('官号跟进');
-        if (m.incentive_topic || m.incentive_link) tags.push('作者激励');
-        if (tags.length) line += ' [' + tags.join('+') + ']';
-        return line;
+      // ===== 第一条：服务端自动截图并推送图片 =====
+      var shotRes = await fetch('/screenshot-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate, endDate, chatid: 'wrkSFfCgAA_4ywmlvYyZmOXzc5qjTzRA' })
       });
-      const description = startDate + ' ~ ' + endDate + ' | 共 ' + memes.length + ' 条\n' + descLines.join('\n');
+      var shotData = await shotRes.json();
+      if (!shotData.ok) throw new Error(shotData.error || '截图推送失败');
 
-      // 图文卡片推送（通过 API 代理）
-      await apiPost('/webhook/wecom', {
-        msgtype: 'news',
-        news: {
-          articles: [{
-            title: '热梗洞察周报',
-            description: description.substring(0, 500),
-            url: reportUrl,
-            picurl: picurl
-          }]
+      // ===== 稍等后发第二条：markdown 文字版 =====
+      await new Promise(function(resolve) { setTimeout(resolve, 1500); });
+
+      var priorityLabel = { red: '必上', orange: '推荐', blue: '可选' };
+      var categoryLabel = { wangzhe: '王者', public: '大众' };
+      var mdLines = ['**热梗洞察周报** | ' + startDate + ' ~ ' + endDate + '　共 ' + memes.length + ' 条', ''];
+      memes.forEach(function(m, i) {
+        var tags = [];
+        if (m.priority && priorityLabel[m.priority]) tags.push(priorityLabel[m.priority]);
+        if (m.category && categoryLabel[m.category]) tags.push(categoryLabel[m.category]);
+        var tagStr = tags.length ? '[' + tags.join('·') + '] ' : '';
+        var line = (i + 1) + '. ' + tagStr + '**' + m.name + '**';
+        if (m.source_url) line += '  [视频](' + m.source_url + ')';
+        if (m.summary) line += '\n   > ' + m.summary;
+        if (m.official_title || m.official_link) {
+          line += '\n   > 官号跟进：' + (m.official_title || '') + (m.official_link ? '  [查看](' + m.official_link + ')' : '');
         }
+        if (m.incentive_topic || m.incentive_link) {
+          line += '\n   > 作者激励：' + (m.incentive_topic || '') + (m.incentive_link ? '  [查看](' + m.incentive_link + ')' : '');
+        }
+        mdLines.push(line);
       });
+      mdLines.push('');
+      mdLines.push('[查看完整报告](' + reportUrl + ')');
+
+      await apiPost('/webhook/wecom', { msgtype: 'markdown', content: mdLines.join('\n'), chatid: 'wrkSFfCgAA_4ywmlvYyZmOXzc5qjTzRA' });
 
       showToast('📣 已推送到企微群！', 'success');
     } catch (err) {
       showToast('❌ 推送失败: ' + (err.message || '网络错误'), 'error');
     } finally {
       this.disabled = false;
+      this.style.opacity = '1';
       this.textContent = '📣 推送到企微群';
     }
   });

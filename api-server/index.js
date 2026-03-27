@@ -195,34 +195,208 @@ app.delete('/memes/:id/permanent', async (req, res) => {
   }
 });
 
-// ===== 企微 Webhook 代理 =====
-app.post('/webhook/wecom', async (req, res) => {
-  try {
-    const webhookUrl = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=348c0b28-1605-47e6-8956-06c81a04d446';
-    const https = require('https');
-    const url = new URL(webhookUrl);
-    
-    const postData = JSON.stringify(req.body);
-    
-    const result = await new Promise((resolve, reject) => {
-      const request = https.request({
-        hostname: url.hostname,
-        path: url.pathname + url.search,
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) }
-      }, (response) => {
-        let data = '';
-        response.on('data', chunk => data += chunk);
-        response.on('end', () => resolve(JSON.parse(data)));
+// ===== 企微智能机器人推送代理 =====
+// 将推送请求转发给 aibot-client.js 进程（127.0.0.1:4001）
+const AIBOT_HTTP_PORT = parseInt(process.env.AIBOT_HTTP_PORT || '4001');
+
+async function callAibotClient(path, body) {
+  const http = require('http');
+  const postData = JSON.stringify(body);
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      hostname: '127.0.0.1',
+      port: AIBOT_HTTP_PORT,
+      path,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { resolve({ ok: false, error: data }); }
       });
-      request.on('error', reject);
-      request.write(postData);
-      request.end();
     });
-    
+    req.on('error', reject);
+    req.write(postData);
+    req.end();
+  });
+}
+
+
+// POST /screenshot-report - 对报告页面截图并推送图片消息
+app.post('/screenshot-report', async (req, res) => {
+  try {
+    const { startDate, endDate, chatid, chat_type } = req.body;
+    if (!startDate || !endDate) {
+      return res.status(400).json({ ok: false, error: 'startDate 和 endDate 不能为空' });
+    }
+
+    const puppeteer = require('puppeteer-core');
+    const crypto = require('crypto');
+
+    const reportUrl = `http://127.0.0.1:3000/?report=${startDate}_${endDate}`;
+    console.log('[screenshot] 截图 URL:', reportUrl);
+
+    const browser = await puppeteer.launch({
+      executablePath: '/usr/bin/ungoogled-chromium',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-web-security',
+        '--font-render-hinting=none'
+      ],
+      headless: true
+    });
+
+    const page = await browser.newPage();
+    // 手机宽度，适合群里查看
+    await page.setViewport({ width: 750, height: 1334, deviceScaleFactor: 2 });
+    await page.goto(reportUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+
+    // 等待报告内容渲染完成
+    await new Promise(r => setTimeout(r, 2500));
+
+    // 截取完整页面
+    const screenshotBuffer = await page.screenshot({
+      fullPage: true,
+      type: 'jpeg',
+      quality: 85
+    });
+
+    await browser.close();
+
+    console.log('[screenshot] 截图完成，大小:', screenshotBuffer.length, 'bytes');
+
+    // ===== 保存截图到 public 目录，生成公开 URL =====
+    const fs = require('fs');
+    const screenshotDir = path.join(__dirname, 'public', 'screenshots');
+    if (!fs.existsSync(screenshotDir)) fs.mkdirSync(screenshotDir, { recursive: true });
+
+    const filename = `report_${startDate}_${endDate}_${Date.now()}.jpg`;
+    const filepath = path.join(screenshotDir, filename);
+    fs.writeFileSync(filepath, screenshotBuffer);
+
+    const serverHost = `http://21.6.179.196:3000`;
+    const imageUrl = `${serverHost}/screenshots/${filename}`;
+    const publicReportUrl = `${serverHost}/?report=${startDate}_${endDate}`;
+
+    console.log('[screenshot] 截图已保存，URL:', imageUrl);
+
+    // ===== 通过 WebSocket 上传素材发真实图片 =====
+    const base64 = screenshotBuffer.toString('base64');
+    const result = await callAibotClient('/upload-and-send', {
+      chatid: chatid,
+      chat_type: chat_type,
+      base64,
+      filename: filename,
+      filetype: 'image'
+    });
+
+    res.json({ ok: true, size: screenshotBuffer.length, imageUrl, result });
+  } catch (e) {
+    console.error('[screenshot] 错误:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+
+// POST /upload-only - 只上传素材获取 media_id，不发消息（供前端图文混排用）
+app.post('/upload-only', async (req, res) => {
+  try {
+    const result = await callAibotClient('/upload-only', req.body);
     res.json(result);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// POST /push-image - 接收手动上传的截图，保存后推送到企微群
+const multer = require("multer");
+const fs = require("fs");
+
+const screenshotUploadDir = path.join(__dirname, "public", "screenshots");
+if (!fs.existsSync(screenshotUploadDir)) fs.mkdirSync(screenshotUploadDir, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: screenshotUploadDir,
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname) || ".jpg";
+      cb(null, "manual_" + Date.now() + ext);
+    }
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 }
+});
+
+app.post("/push-image", upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ ok: false, error: "没有收到图片" });
+
+    const serverHost = "http://21.6.179.196:3000";
+    const imageUrl = serverHost + "/screenshots/" + req.file.filename;
+    const title = req.body.title || "热梗洞察周报";
+    const extra = req.body.extra || "";
+
+    let mdContent = `**🔥 ${title}**\n\n${imageUrl}`;
+    if (extra && extra.trim()) {
+      mdContent += "\n\n" + extra.trim();
+    }
+
+    const result = await callAibotClient("/send", {
+      msgtype: "markdown",
+      content: mdContent
+    });
+
+    res.json({ ok: true, imageUrl, result });
+  } catch (e) {
+    console.error("[push-image] 错误:", e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// POST /webhook/wecom - 通过智能机器人推送消息（供前端调用）
+app.post('/webhook/wecom', async (req, res) => {
+  try {
+    const { content, chatid, chat_type, msgtype, template_card, news, image } = req.body;
+    const resolvedMsgtype = msgtype || 'markdown';
+
+    // news、template_card、image 类型不需要 content
+    if (!content && !['template_card', 'news', 'image'].includes(resolvedMsgtype)) {
+      return res.status(400).json({ ok: false, error: 'content 不能为空' });
+    }
+
+    const payload = { msgtype: resolvedMsgtype };
+    if (content) payload.content = content;
+    if (chatid) payload.chatid = chatid;
+    if (chat_type !== undefined) payload.chat_type = chat_type;
+    if (template_card) payload.template_card = template_card;
+    if (news) payload.news = news;
+    if (image) payload.image = image;
+
+    const result = await callAibotClient('/send', payload);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// GET /webhook/aibot/health - 查看 WebSocket 连接状态
+app.get('/webhook/aibot/health', async (req, res) => {
+  try {
+    const http = require('http');
+    const result = await new Promise((resolve, reject) => {
+      http.get({ hostname: '127.0.0.1', port: AIBOT_HTTP_PORT, path: '/health' }, (r) => {
+        let data = '';
+        r.on('data', chunk => data += chunk);
+        r.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { resolve({ raw: data }); } });
+      }).on('error', reject);
+    });
+    res.json(result);
+  } catch (e) {
+    res.status(503).json({ ok: false, error: 'aibot-client 未运行: ' + e.message });
   }
 });
 
