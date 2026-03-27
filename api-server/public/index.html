@@ -1603,7 +1603,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
         const emoji = PLACEHOLDER_EMOJIS[Math.floor(Math.random() * PLACEHOLDER_EMOJIS.length)];
         const imgSrc = meme.image_path && meme.image_path.startsWith('http') ? meme.image_path : '';
 
-        html += `<div class="meme-card">
+        html += `<div class="meme-card" data-id="${meme.id}">
       <span class="card-number">#${globalIdx}</span>`;
 
         if (meme.category === 'wangzhe') {
@@ -1818,7 +1818,7 @@ window.addEventListener('load', function() {
       var docUrl = 'https://docs.qq.com/smartsheet/DSm5oVGdybWdkWkdH';
       mdLines.push('共 ' + memes.length + ' 条 | [查看完整报告](' + docUrl + ')');
 
-      await apiPost('/webhook/wecom', { msgtype: 'markdown', content: mdLines.join('\n'), chatid: 'wrkSFfCgAA_4ywmlvYyZmOXzc5qjTzRA' });
+      await apiPost('/webhook/wecom', { msgtype: 'markdown', content: mdLines.join('\n'), broadcast: true });
 
       // ===== 稍等后发第二条：截图图片 =====
       await new Promise(function(resolve) { setTimeout(resolve, 800); });
@@ -1826,7 +1826,7 @@ window.addEventListener('load', function() {
       var shotRes = await fetch('/screenshot-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDate, endDate, chatid: 'wrkSFfCgAA_4ywmlvYyZmOXzc5qjTzRA' })
+        body: JSON.stringify({ startDate, endDate })
       });
       var shotData = await shotRes.json();
       if (!shotData.ok) throw new Error(shotData.error || '截图推送失败');
@@ -1898,7 +1898,7 @@ window.addEventListener('load', function() {
       reportView.innerHTML = '<div style="text-align:center;padding:40px 20px"><div class="spinner"></div><p style="margin-top:12px;color:#999">加载周报中...</p></div>';
       document.querySelector('.container').appendChild(reportView);
 
-      // 加载数据并渲染
+      // 加载数据并渲染（使用与预览相同的 generateReportHTML 生成 16:9 四列布局）
       (async function() {
         try {
           const memes = await apiGet('/memes?start_date=' + rStart + '&end_date=' + rEnd);
@@ -1912,81 +1912,51 @@ window.addEventListener('load', function() {
           const priorityOrder = { red: 0, orange: 1, blue: 2, '': 3 };
           filtered.sort((a, b) => (priorityOrder[a.priority || ''] || 3) - (priorityOrder[b.priority || ''] || 3));
 
-          // 渲染周报列表
-          const priorityLabel = { red: '🔴 必上', orange: '🟠 推荐', blue: '🔵 可选' };
-          const categoryLabel = { wangzhe: '🎮 王者', public: '🌍 大众' };
-          const wangzheCount = filtered.filter(m => m.category === 'wangzhe').length;
-          const publicCount = filtered.filter(m => m.category === 'public').length;
+          // 直接用 generateReportHTML 生成完整 16:9 周报
+          const fullHtml = generateReportHTML(filtered, rStart, rEnd);
 
-          let html = '<div style="max-width:640px;margin:0 auto;padding:6px 8px">';
-          // 头部 - 更紧凑
-          html += '<div style="background:linear-gradient(135deg,#667eea,#764ba2);border-radius:10px;padding:14px 16px;text-align:center;color:white;margin-bottom:6px">';
-          html += '<div style="font-size:20px;font-weight:800;margin-bottom:4px">🔥 热梗洞察周报</div>';
-          html += '<div style="font-size:12px;opacity:0.85">' + rStart + ' ~ ' + rEnd + '</div>';
-          html += '<div style="margin-top:6px;display:flex;justify-content:center;gap:6px;flex-wrap:wrap">';
-          html += '<span style="background:rgba(255,255,255,0.2);border-radius:10px;padding:1px 8px;font-size:10px">🎮 ' + wangzheCount + '</span>';
-          html += '<span style="background:rgba(255,255,255,0.2);border-radius:10px;padding:1px 8px;font-size:10px">🌍 ' + publicCount + '</span>';
-          html += '<span style="background:rgba(255,255,255,0.2);border-radius:10px;padding:1px 8px;font-size:10px">共 ' + filtered.length + '</span>';
-          html += '</div>';
-          html += '</div>';
+          // 提取 <body> 内容和 <style> 内容，注入当前页面
+          const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+          const styleMatch = fullHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
 
-          // 热梗卡片列表 - 更紧凑
-          filtered.forEach((m, i) => {
-            const imgSrc = m.image_path && m.image_path.startsWith('http') ? m.image_path : '';
-            const pri = priorityLabel[m.priority || ''] || '';
-            const cat = categoryLabel[m.category || ''] || '';
-            const summary = m.summary || '';
+          if (styleMatch) {
+            const styleEl = document.createElement('style');
+            styleEl.textContent = styleMatch[1];
+            document.head.appendChild(styleEl);
+          }
 
-            html += '<div style="background:white;border-radius:8px;margin-bottom:5px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.04);display:flex;min-height:64px">';
-            // 左侧图片 - 缩小
-            if (imgSrc) {
-              html += '<div style="width:72px;min-height:64px;flex-shrink:0">';
-              html += '<img src="' + imgSrc + '" style="width:100%;height:100%;object-fit:cover;display:block">';
-              html += '</div>';
-            }
-            // 右侧内容 - 更紧凑
-            html += '<div style="padding:6px 8px;flex:1;min-width:0">';
-            html += '<div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:3px">';
-            if (pri) html += '<span style="font-size:10px;background:#fef3f2;color:#e74c3c;padding:0 6px;border-radius:6px;line-height:18px">' + pri + '</span>';
-            if (cat) html += '<span style="font-size:10px;background:#f0f4ff;color:#3b82f6;padding:0 6px;border-radius:6px;line-height:18px">' + cat + '</span>';
-            html += '</div>';
-            if (m.source_url) {
-              html += '<a href="' + escapeHtml(m.source_url) + '" target="_blank" style="font-size:14px;font-weight:700;color:#2d3436;text-decoration:none;line-height:1.3;display:block;margin-bottom:2px">' + escapeHtml(m.name) + '</a>';
-            } else {
-              html += '<div style="font-size:14px;font-weight:700;color:#2d3436;margin-bottom:2px">' + escapeHtml(m.name) + '</div>';
-            }
-            if (summary) html += '<div style="font-size:11px;color:#888;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">' + escapeHtml(summary) + '</div>';
-
-            // 跟进案例 - 更紧凑
-            if (m.official_title || m.official_link || m.incentive_topic || m.incentive_link) {
-              html += '<div style="margin-top:4px;padding-top:4px;border-top:1px dashed #eee;font-size:10px">';
-              if (m.official_title || m.official_link) {
-                html += '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;flex-wrap:wrap">';
-                html += '<span style="background:#e8f4fd;color:#1a73e8;padding:0 5px;border-radius:3px;font-weight:600">📢 官号</span>';
-                if (m.official_title) html += '<span style="color:#444">' + escapeHtml(m.official_title) + '</span>';
-                if (m.official_link) html += '<a href="' + escapeHtml(m.official_link) + '" target="_blank" style="color:#3b82f6;text-decoration:none">→</a>';
-                html += '</div>';
-              }
-              if (m.incentive_topic || m.incentive_link) {
-                html += '<div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap">';
-                html += '<span style="background:#fef3e2;color:#e67e22;padding:0 5px;border-radius:3px;font-weight:600">🎯 激励</span>';
-                if (m.incentive_topic) html += '<span style="color:#444">' + escapeHtml(m.incentive_topic) + '</span>';
-                if (m.incentive_link) html += '<a href="' + escapeHtml(m.incentive_link) + '" target="_blank" style="color:#3b82f6;text-decoration:none">→</a>';
-                html += '</div>';
-              }
-              html += '</div>';
-            }
-
-            html += '</div></div>';
-          });
-
-          html += '</div>';
-          reportView.innerHTML = html;
+          reportView.innerHTML = bodyMatch ? bodyMatch[1] : fullHtml;
         } catch (err) {
           reportView.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#f5576c"><p>加载失败：' + (err.message || '未知错误') + '</p></div>';
         }
       })();
     }
+  } else if (urlParams.get('edit')) {
+    // ?edit=梗ID：自动管理员登录 → 定位到该梗 → 弹出图片上传
+    const editId = urlParams.get('edit');
+    // 自动以管理员身份进入
+    if (!isAdmin) {
+      isAdmin = true;
+      localStorage.setItem('memebot_admin', '1');
+      applyAdminMode();
+    }
+    // 切到已录入列表
+    document.querySelector('.tab-btn[data-tab="list"]').click();
+    // 等列表加载完后定位卡片
+    setTimeout(() => {
+      const card = document.querySelector('.meme-item[data-id="' + editId + '"], .meme-card[data-id="' + editId + '"]');
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.style.outline = '3px solid #f5576c';
+        card.style.outlineOffset = '4px';
+        setTimeout(() => { card.style.outline = ''; card.style.outlineOffset = ''; }, 5000);
+        // 自动弹出图片上传
+        const thumb = card.querySelector('.thumb-wrapper[data-id]');
+        if (thumb) thumb.click();
+      } else {
+        showToast('未找到该热梗，可能已被删除', 'error');
+      }
+    }, 1200);
   } else if (!isAdmin) {
     document.querySelector('.tab-btn[data-tab="list"]').click();
   }
