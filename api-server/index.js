@@ -294,15 +294,44 @@ app.post('/screenshot-report', async (req, res) => {
 
     // ===== 通过 WebSocket 上传素材发真实图片 =====
     const base64 = screenshotBuffer.toString('base64');
-    const result = await callAibotClient('/upload-and-send', {
-      chatid: chatid,
-      chat_type: chat_type,
-      base64,
-      filename: filename,
-      filetype: 'image'
-    });
 
-    res.json({ ok: true, size: screenshotBuffer.length, imageUrl, result });
+    // 支持广播：不传 chatid 时获取群列表，逐群上传发送
+    if (!chatid) {
+      // 广播到所有群
+      const httpLib = require('http');
+      const chatsResp = await new Promise((resolve, reject) => {
+        httpLib.get({ hostname: '127.0.0.1', port: AIBOT_HTTP_PORT, path: '/chats' }, (r) => {
+          let data = '';
+          r.on('data', chunk => data += chunk);
+          r.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { resolve({ chats: [] }); } });
+        }).on('error', () => resolve({ chats: [] }));
+      });
+      const chats = (chatsResp.chats || []).filter(c => c.authenticated);
+      const results = [];
+      for (const chat of chats) {
+        try {
+          const r = await callAibotClient('/upload-and-send', {
+            chatid: chat.chatid,
+            chat_type: chat_type || 2,
+            base64, filename, filetype: 'image'
+          });
+          results.push({ chatid: chat.chatid, name: chat.name, ok: true, result: r });
+          // 间隔 1.5s 防企微丢消息
+          if (chats.indexOf(chat) < chats.length - 1) {
+            await new Promise(r => setTimeout(r, 1500));
+          }
+        } catch (e) {
+          results.push({ chatid: chat.chatid, name: chat.name, ok: false, error: e.message });
+        }
+      }
+      res.json({ ok: true, broadcast: true, size: screenshotBuffer.length, imageUrl, results });
+    } else {
+      // 单群发送
+      const result = await callAibotClient('/upload-and-send', {
+        chatid, chat_type: chat_type || 2, base64, filename, filetype: 'image'
+      });
+      res.json({ ok: true, size: screenshotBuffer.length, imageUrl, result });
+    }
   } catch (e) {
     console.error('[screenshot] 错误:', e.message);
     res.status(500).json({ ok: false, error: e.message });
@@ -365,9 +394,10 @@ app.post("/push-image", upload.single("image"), async (req, res) => {
 });
 
 // POST /webhook/wecom - 通过智能机器人推送消息（供前端调用）
+// 支持 broadcast=true 广播到所有群
 app.post('/webhook/wecom', async (req, res) => {
   try {
-    const { content, chatid, chat_type, msgtype, template_card, news, image } = req.body;
+    const { content, chatid, chat_type, msgtype, template_card, news, image, broadcast } = req.body;
     const resolvedMsgtype = msgtype || 'markdown';
 
     // news、template_card、image 类型不需要 content
@@ -382,11 +412,29 @@ app.post('/webhook/wecom', async (req, res) => {
     if (template_card) payload.template_card = template_card;
     if (news) payload.news = news;
     if (image) payload.image = image;
+    if (broadcast) payload.broadcast = true;
 
     const result = await callAibotClient('/send', payload);
     res.json(result);
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// GET /webhook/aibot/chats - 获取所有群列表
+app.get('/webhook/aibot/chats', async (req, res) => {
+  try {
+    const http = require('http');
+    const result = await new Promise((resolve, reject) => {
+      http.get({ hostname: '127.0.0.1', port: AIBOT_HTTP_PORT, path: '/chats' }, (r) => {
+        let data = '';
+        r.on('data', chunk => data += chunk);
+        r.on('end', () => { try { resolve(JSON.parse(data)); } catch (e) { resolve({ raw: data }); } });
+      }).on('error', reject);
+    });
+    res.json(result);
+  } catch (e) {
+    res.status(503).json({ ok: false, error: 'aibot-client 未运行: ' + e.message });
   }
 });
 

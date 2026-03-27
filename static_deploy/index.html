@@ -1818,7 +1818,7 @@ window.addEventListener('load', function() {
       var docUrl = 'https://docs.qq.com/smartsheet/DSm5oVGdybWdkWkdH';
       mdLines.push('共 ' + memes.length + ' 条 | [查看完整报告](' + docUrl + ')');
 
-      await apiPost('/webhook/wecom', { msgtype: 'markdown', content: mdLines.join('\n'), chatid: 'wrkSFfCgAA_4ywmlvYyZmOXzc5qjTzRA' });
+      await apiPost('/webhook/wecom', { msgtype: 'markdown', content: mdLines.join('\n'), broadcast: true });
 
       // ===== 稍等后发第二条：截图图片 =====
       await new Promise(function(resolve) { setTimeout(resolve, 800); });
@@ -1826,7 +1826,7 @@ window.addEventListener('load', function() {
       var shotRes = await fetch('/screenshot-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDate, endDate, chatid: 'wrkSFfCgAA_4ywmlvYyZmOXzc5qjTzRA' })
+        body: JSON.stringify({ startDate, endDate })
       });
       var shotData = await shotRes.json();
       if (!shotData.ok) throw new Error(shotData.error || '截图推送失败');
