@@ -19,6 +19,11 @@ const WebSocket = require('ws');
 const http = require('http');
 const crypto = require('crypto');
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
+
+// ========== CHAT_ID 持久化 ==========
+const CHAT_IDS_FILE = path.join(__dirname, 'chat_ids.json');
 
 // ========== 多机器人配置 ==========
 const CHAT_TYPE  = parseInt(process.env.CHAT_TYPE || '2');
@@ -64,12 +69,42 @@ function genReqId() {
   return crypto.randomUUID().replace(/-/g, '').substring(0, 16);
 }
 
+// ========== CHAT_ID 持久化读写 ==========
+function loadPersistedChatIds() {
+  try {
+    if (fs.existsSync(CHAT_IDS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(CHAT_IDS_FILE, 'utf-8'));
+      log('INFO', `从 ${CHAT_IDS_FILE} 恢复 CHAT_ID 缓存`, data);
+      return data; // { botId: [chatid1, chatid2, ...] }
+    }
+  } catch (e) {
+    log('WARN', `读取 CHAT_ID 缓存失败: ${e.message}`);
+  }
+  return {};
+}
+
+function savePersistedChatIds() {
+  const data = {};
+  for (const [botId, bot] of bots) {
+    data[botId] = [...bot.chatIds];
+  }
+  try {
+    fs.writeFileSync(CHAT_IDS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    log('INFO', `CHAT_ID 已持久化到 ${CHAT_IDS_FILE}`);
+  } catch (e) {
+    log('ERROR', `持久化 CHAT_ID 失败: ${e.message}`);
+  }
+}
+
 // ========== 初始化所有机器人 ==========
 function initBots() {
   if (botConfigs.length === 0) {
     log('ERROR', '未配置任何机器人！请设置 BOTS 或 BOT_ID 环境变量');
     return;
   }
+
+  // 先加载持久化的 CHAT_ID
+  const persisted = loadPersistedChatIds();
 
   for (const cfg of botConfigs) {
     const bot = {
@@ -83,6 +118,13 @@ function initBots() {
     };
     // 如果配置了初始 chat_id，加入集合
     if (cfg.chat_id) bot.chatIds.add(cfg.chat_id);
+    // 恢复持久化的 CHAT_ID
+    if (persisted[cfg.bot_id]) {
+      for (const cid of persisted[cfg.bot_id]) {
+        bot.chatIds.add(cid);
+      }
+      log('INFO', `[${cfg.name || cfg.bot_id}] 从缓存恢复 ${persisted[cfg.bot_id].length} 个 CHAT_ID`);
+    }
     bots.set(cfg.bot_id, bot);
     connectBot(cfg.bot_id);
   }
@@ -154,6 +196,7 @@ function connectBot(botId) {
       if (body.chatid && !bot.chatIds.has(body.chatid)) {
         bot.chatIds.add(body.chatid);
         log('INFO', `[${cfg.name || botId}] 🆕 发现新群 CHAT_ID: ${body.chatid}`);
+        savePersistedChatIds(); // 持久化到文件
       }
       // 录入处理（附带 botId 信息）
       handleMemeInput(body, botId).catch(err => {
