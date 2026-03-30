@@ -1765,7 +1765,8 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
 <title>🔥 热梗周报</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif; background: #f5f5f7; color: #1d1d1f; width: 750px; overflow: hidden; }
+  html { width: 750px; max-width: 750px; overflow: hidden; }
+  body { font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif; background: #f5f5f7; color: #1d1d1f; width: 750px; max-width: 750px; overflow: hidden; }
 
   /* ===== 封面 ===== */
   .m-cover {
@@ -2000,7 +2001,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   function toggleAllMemes(checked) {
     window._selectedMemeIds.clear();
     if (checked) {
-      window._fetchedMemes.forEach(m => { if (m.priority !== 'gray') window._selectedMemeIds.add(m.id); });
+      window._fetchedMemes.forEach(m => { if (m.priority !== 'gray') window._selectedMemeIds.add(String(m.id)); });
     }
     document.querySelectorAll('#meme-picker-list input[type="checkbox"]').forEach(cb => {
       cb.checked = checked && cb.closest('.meme-pick-item').dataset.priority !== 'gray';
@@ -2030,7 +2031,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     window._fetchedMemes = memes;
     window._selectedMemeIds.clear();
     // 默认勾选非灰色
-    memes.forEach(m => { if (m.priority !== 'gray') window._selectedMemeIds.add(m.id); });
+    memes.forEach(m => { if (m.priority !== 'gray') window._selectedMemeIds.add(String(m.id)); });
 
     let html = '';
     memes.forEach(m => {
@@ -2057,9 +2058,9 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
 
   function onMemeCheckChange(cb, id) {
     if (cb.checked) {
-      window._selectedMemeIds.add(id);
+      window._selectedMemeIds.add(String(id));
     } else {
-      window._selectedMemeIds.delete(id);
+      window._selectedMemeIds.delete(String(id));
     }
     updatePickerSummary();
   }
@@ -2100,7 +2101,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     const selectedIds = window._selectedMemeIds;
     if (selectedIds.size === 0) { showToast('请至少选择一条热梗', 'error'); return; }
 
-    const filtered = window._fetchedMemes.filter(m => selectedIds.has(m.id));
+    const filtered = window._fetchedMemes.filter(m => selectedIds.has(String(m.id)));
     filtered.sort((a, b) => (PRIORITY_ORDER[a.priority || ''] || 3) - (PRIORITY_ORDER[b.priority || ''] || 3));
 
     this.disabled = true;
@@ -2226,13 +2227,13 @@ window.addEventListener('load', function() {
         listEl.innerHTML = '<div style="padding:16px;color:#999;text-align:center">暂无可用群（请先在群里 @机器人 激活）</div>';
         return;
       }
-      window._selectedChatIds.clear();
+      // 不自动全选！保留用户之前的选择（如果有）
+      // 如果 _selectedChatIds 是空的（第一次打开），则不预选任何群
       let html = '';
       chats.forEach((chat, idx) => {
         const chatName = _chatNamesByOrder[idx] || ('群 ' + (idx + 1));
         const isAuth = chat.authenticated;
-        const checked = isAuth;
-        if (isAuth) window._selectedChatIds.add(chat.chatid);
+        const checked = isAuth && window._selectedChatIds.has(chat.chatid);
         html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0;cursor:' + (isAuth ? 'pointer' : 'default') + (isAuth ? '' : ';opacity:0.4') + '">';
         html += '<input type="checkbox"' + (checked ? ' checked' : '') + (isAuth ? '' : ' disabled') + ' data-chatid="' + chat.chatid + '" style="width:18px;height:18px;accent-color:#6366f1" onchange="onChatCheckChange(this)">';
         html += '<div style="flex:1">';
@@ -2300,24 +2301,35 @@ window.addEventListener('load', function() {
       mdLines.push('共 ' + memes.length + ' 条 | [查看完整报告](' + docUrl + ')');
       const mdContent = mdLines.join('\n');
 
-      // 逐群推送
+      // ===== 生成 mobile 版周报 HTML（用勾选的梗）=====
+      const mobileHtml = generateMobileReportHTML(memes, startDate, endDate);
+
+      // ===== 截图一次（传 HTML 给服务端，不再让服务端重新渲染） =====
+      pushBtn.textContent = '⏳ 截图生成中...';
+      var shotRes = await fetch('/screenshot-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate, endDate, html: mobileHtml })
+      });
+      var shotData = await shotRes.json();
+      if (!shotData.ok) throw new Error(shotData.error || '截图生成失败');
+
+      // ===== 逐群推送（markdown + 截图） =====
       let successCount = 0;
-      for (const chatid of selectedChats) {
+      for (let ci = 0; ci < selectedChats.length; ci++) {
+        const chatid = selectedChats[ci];
+        pushBtn.textContent = '⏳ 推送中（' + (ci + 1) + '/' + selectedChats.length + '）...';
         try {
           // 第一条：markdown
           await apiPost('/webhook/wecom', { msgtype: 'markdown', content: mdContent, chatid: chatid });
-          await new Promise(r => setTimeout(r, 800));
-          // 第二条：截图
-          var shotRes = await fetch('/screenshot-report', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ startDate, endDate, chatid: chatid })
-          });
-          var shotData = await shotRes.json();
-          if (!shotData.ok) console.warn('截图推送失败(' + chatid + '):', shotData.error);
+          await new Promise(r => setTimeout(r, 1500));
+          // 第二条：截图图片（直接用已截图的 base64 上传发送）
+          if (shotData.images && shotData.images.length > 0 && shotData.images[0].base64) {
+            await apiPost('/upload-and-send-image', { chatid: chatid, base64: shotData.images[0].base64, filename: shotData.images[0].filename || 'report.jpg' });
+          }
           successCount++;
           // 群间间隔
-          if (selectedChats.indexOf(chatid) < selectedChats.length - 1) {
+          if (ci < selectedChats.length - 1) {
             await new Promise(r => setTimeout(r, 2000));
           }
         } catch (chatErr) {

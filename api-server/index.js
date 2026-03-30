@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 // ===== 静态文件托管（前端页面） =====
 app.use(express.static(path.join(__dirname, 'public')));
@@ -231,19 +231,16 @@ async function callAibotClient(path, body) {
 }
 
 
-// POST /screenshot-report - 对报告页面截图并推送图片消息
+// POST /screenshot-report - 对前端传来的 HTML 截图并推送图片消息
 app.post('/screenshot-report', async (req, res) => {
   try {
-    const { startDate, endDate, chatid, chat_type } = req.body;
+    const { startDate, endDate, chatid, chat_type, html: reportHtml } = req.body;
     if (!startDate || !endDate) {
       return res.status(400).json({ ok: false, error: 'startDate 和 endDate 不能为空' });
     }
 
     const puppeteer = require('puppeteer-core');
     const crypto = require('crypto');
-
-    const reportUrl = `http://127.0.0.1:3000/?report=${startDate}_${endDate}&mobile=1`;
-    console.log('[screenshot] 截图 URL (mobile):', reportUrl);
 
     const browser = await puppeteer.launch({
       executablePath: '/usr/bin/ungoogled-chromium',
@@ -261,15 +258,22 @@ app.post('/screenshot-report', async (req, res) => {
     const page = await browser.newPage();
     // 手机版 750px 宽，2x 清晰度
     await page.setViewport({ width: 750, height: 1334, deviceScaleFactor: 2 });
-    await page.goto(reportUrl, { waitUntil: 'networkidle0', timeout: 30000 });
 
-    // 等待 document.write 完成（手机版会替换整个页面）+ 图片渲染
-    await page.waitForFunction(() => {
-      // 等待页面有实际内容（封面元素出现）
-      return document.querySelector('.m-cover') || document.querySelector('.report-page');
-    }, { timeout: 15000 }).catch(() => {});
-    // 再等图片加载完成
-    await new Promise(r => setTimeout(r, 4000));
+    if (reportHtml) {
+      // 新方式：前端传 HTML 直接渲染（包含勾选后的梗）
+      console.log('[screenshot] 使用前端传入的 HTML，长度:', reportHtml.length);
+      await page.setContent(reportHtml, { waitUntil: 'networkidle0', timeout: 30000 });
+    } else {
+      // 旧方式兼容：通过 URL 渲染
+      const reportUrl = `http://127.0.0.1:3000/?report=${startDate}_${endDate}&mobile=1`;
+      console.log('[screenshot] 截图 URL (mobile):', reportUrl);
+      await page.goto(reportUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+      await page.waitForFunction(() => {
+        return document.querySelector('.m-cover') || document.querySelector('.report-page');
+      }, { timeout: 15000 }).catch(() => {});
+    }
+    // 等图片加载完成
+    await new Promise(r => setTimeout(r, 5000));
 
     // ===== 全页面一张图截图 =====
     // 两列布局紧凑排版，整页截成一张图推送
@@ -277,18 +281,28 @@ app.post('/screenshot-report', async (req, res) => {
     const screenshotDir = path.join(__dirname, 'public', 'screenshots');
     if (!fs.existsSync(screenshotDir)) fs.mkdirSync(screenshotDir, { recursive: true });
 
+    // 确保页面不超过 750px 宽
+    await page.evaluate(() => {
+      document.documentElement.style.cssText = 'width:750px;max-width:750px;overflow:hidden;';
+      document.body.style.cssText += ';width:750px;max-width:750px;overflow:hidden;';
+    });
+    await new Promise(r => setTimeout(r, 500));
+
     const totalHeight = await page.evaluate(() => document.body.scrollHeight);
-    console.log(`[screenshot] 页面总高度: ${totalHeight}px`);
+    const scrollWidth = await page.evaluate(() => document.body.scrollWidth);
+    console.log(`[screenshot] 页面尺寸: ${scrollWidth}x${totalHeight}px`);
 
     const MAX_SIZE = 2 * 1024 * 1024;
     let quality = 85;
-    let buf = await page.screenshot({ type: 'jpeg', quality, fullPage: true });
-    console.log(`[screenshot] fullPage quality=${quality}, 大小: ${(buf.length/1024/1024).toFixed(2)}MB`);
+    // 使用 clip 精确裁剪到 750px 宽
+    const clipRect = { x: 0, y: 0, width: 750, height: totalHeight };
+    let buf = await page.screenshot({ type: 'jpeg', quality, clip: clipRect });
+    console.log(`[screenshot] clip截图 quality=${quality}, 大小: ${(buf.length/1024/1024).toFixed(2)}MB`);
 
     // 超 2MB 则降质
     while (buf.length > MAX_SIZE && quality > 30) {
       quality -= 10;
-      buf = await page.screenshot({ type: 'jpeg', quality, fullPage: true });
+      buf = await page.screenshot({ type: 'jpeg', quality, clip: clipRect });
       console.log(`[screenshot] 降质 quality=${quality}, 大小: ${(buf.length/1024/1024).toFixed(2)}MB`);
     }
 
@@ -297,11 +311,13 @@ app.post('/screenshot-report', async (req, res) => {
       console.log('[screenshot] 2x仍超限，切换1x重试');
       await page.setViewport({ width: 750, height: 1334, deviceScaleFactor: 1 });
       await new Promise(r => setTimeout(r, 1000));
+      const newHeight = await page.evaluate(() => document.body.scrollHeight);
+      const clipRect1x = { x: 0, y: 0, width: 750, height: newHeight };
       quality = 85;
-      buf = await page.screenshot({ type: 'jpeg', quality, fullPage: true });
+      buf = await page.screenshot({ type: 'jpeg', quality, clip: clipRect1x });
       while (buf.length > MAX_SIZE && quality > 30) {
         quality -= 10;
-        buf = await page.screenshot({ type: 'jpeg', quality, fullPage: true });
+        buf = await page.screenshot({ type: 'jpeg', quality, clip: clipRect1x });
       }
       console.log(`[screenshot] 1x quality=${quality}, 大小: ${(buf.length/1024/1024).toFixed(2)}MB`);
     }
@@ -318,6 +334,11 @@ app.post('/screenshot-report', async (req, res) => {
     const imageInfos = [{ filename: fname, url: `${serverHost}/screenshots/${fname}`, size: buf.length, base64: buf.toString('base64') }];
 
     console.log('[screenshot] 截图已保存，共', imageInfos.length, '张');
+
+    // ===== 如果是前端传了 HTML，只截图不推送，返回 base64 =====
+    if (reportHtml) {
+      return res.json({ ok: true, totalPages: 1, images: imageInfos.map(i => ({ url: i.url, size: i.size, base64: i.base64, filename: i.filename })) });
+    }
 
     // ===== 逐张推送到企微群 =====
     const sendToChat = async (chatid, chatType) => {
@@ -381,6 +402,27 @@ app.post('/upload-only', async (req, res) => {
     const result = await callAibotClient('/upload-only', req.body);
     res.json(result);
   } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// POST /upload-and-send-image - 前端传 base64 图片+chatid，上传并发送到指定群
+app.post('/upload-and-send-image', async (req, res) => {
+  try {
+    const { chatid, base64, filename } = req.body;
+    if (!chatid || !base64) {
+      return res.status(400).json({ ok: false, error: 'chatid 和 base64 不能为空' });
+    }
+    const result = await callAibotClient('/upload-and-send', {
+      chatid,
+      chat_type: 2,
+      base64,
+      filename: filename || 'report.jpg',
+      filetype: 'image'
+    });
+    res.json({ ok: true, result });
+  } catch (e) {
+    console.error('[upload-and-send-image] 错误:', e.message);
     res.status(500).json({ ok: false, error: e.message });
   }
 });
