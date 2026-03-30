@@ -1765,8 +1765,9 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
 <title>🔥 热梗周报</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html { width: 750px; max-width: 750px; overflow: hidden; }
-  body { font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif; background: #f5f5f7; color: #1d1d1f; width: 750px; max-width: 750px; overflow: hidden; }
+  html, body { width: 750px !important; max-width: 750px !important; overflow-x: hidden !important; margin: 0; padding: 0; }
+  body { font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif; background: #f5f5f7; color: #1d1d1f; }
+  .m-root { width: 750px; max-width: 750px; overflow: hidden; margin: 0 auto; }
 
   /* ===== 封面 ===== */
   .m-cover {
@@ -1895,6 +1896,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
 </style>
 </head>
 <body>
+<div class="m-root">
 
 <!-- 封面 -->
 <div class="m-cover">
@@ -1985,6 +1987,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   <div class="text">热梗洞察 · 用户社区组</div>
 </div>
 
+</div><!-- .m-root -->
 </body></html>`;
     return html;
   }

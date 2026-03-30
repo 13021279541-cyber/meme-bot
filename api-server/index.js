@@ -283,26 +283,41 @@ app.post('/screenshot-report', async (req, res) => {
 
     // 确保页面不超过 750px 宽
     await page.evaluate(() => {
-      document.documentElement.style.cssText = 'width:750px;max-width:750px;overflow:hidden;';
-      document.body.style.cssText += ';width:750px;max-width:750px;overflow:hidden;';
+      document.documentElement.style.cssText = 'width:750px;max-width:750px;overflow:hidden;margin:0;padding:0;';
+      document.body.style.cssText = 'width:750px;max-width:750px;overflow:hidden;margin:0;padding:0;';
     });
     await new Promise(r => setTimeout(r, 500));
 
-    const totalHeight = await page.evaluate(() => document.body.scrollHeight);
-    const scrollWidth = await page.evaluate(() => document.body.scrollWidth);
-    console.log(`[screenshot] 页面尺寸: ${scrollWidth}x${totalHeight}px`);
+    // 优先截 .m-root 元素（精确750px），fallback 到全页面 clip
+    const rootEl = await page.$('.m-root');
+    const totalHeight = await page.evaluate(() => {
+      const root = document.querySelector('.m-root');
+      return root ? root.scrollHeight : document.body.scrollHeight;
+    });
+    const scrollWidth = await page.evaluate(() => {
+      const root = document.querySelector('.m-root');
+      return root ? root.scrollWidth : document.body.scrollWidth;
+    });
+    console.log(`[screenshot] 页面尺寸: ${scrollWidth}x${totalHeight}px, 使用${rootEl ? '.m-root元素' : 'clip'}截图`);
 
     const MAX_SIZE = 2 * 1024 * 1024;
     let quality = 85;
-    // 使用 clip 精确裁剪到 750px 宽
-    const clipRect = { x: 0, y: 0, width: 750, height: totalHeight };
-    let buf = await page.screenshot({ type: 'jpeg', quality, clip: clipRect });
-    console.log(`[screenshot] clip截图 quality=${quality}, 大小: ${(buf.length/1024/1024).toFixed(2)}MB`);
+    // 优先用 .m-root 元素截图（精确裁剪），fallback 到 clip
+    const screenshotOpts = rootEl
+      ? { type: 'jpeg', quality }
+      : { type: 'jpeg', quality, clip: { x: 0, y: 0, width: 750, height: totalHeight } };
+    let buf = rootEl
+      ? await rootEl.screenshot(screenshotOpts)
+      : await page.screenshot(screenshotOpts);
+    console.log(`[screenshot] 截图 quality=${quality}, 大小: ${(buf.length/1024/1024).toFixed(2)}MB`);
 
     // 超 2MB 则降质
     while (buf.length > MAX_SIZE && quality > 30) {
       quality -= 10;
-      buf = await page.screenshot({ type: 'jpeg', quality, clip: clipRect });
+      screenshotOpts.quality = quality;
+      buf = rootEl
+        ? await rootEl.screenshot(screenshotOpts)
+        : await page.screenshot(screenshotOpts);
       console.log(`[screenshot] 降质 quality=${quality}, 大小: ${(buf.length/1024/1024).toFixed(2)}MB`);
     }
 
@@ -311,13 +326,22 @@ app.post('/screenshot-report', async (req, res) => {
       console.log('[screenshot] 2x仍超限，切换1x重试');
       await page.setViewport({ width: 750, height: 1334, deviceScaleFactor: 1 });
       await new Promise(r => setTimeout(r, 1000));
-      const newHeight = await page.evaluate(() => document.body.scrollHeight);
-      const clipRect1x = { x: 0, y: 0, width: 750, height: newHeight };
+      const rootEl1x = await page.$('.m-root');
       quality = 85;
-      buf = await page.screenshot({ type: 'jpeg', quality, clip: clipRect1x });
+      if (rootEl1x) {
+        buf = await rootEl1x.screenshot({ type: 'jpeg', quality });
+      } else {
+        const newHeight = await page.evaluate(() => document.body.scrollHeight);
+        buf = await page.screenshot({ type: 'jpeg', quality, clip: { x: 0, y: 0, width: 750, height: newHeight } });
+      }
       while (buf.length > MAX_SIZE && quality > 30) {
         quality -= 10;
-        buf = await page.screenshot({ type: 'jpeg', quality, clip: clipRect1x });
+        if (rootEl1x) {
+          buf = await rootEl1x.screenshot({ type: 'jpeg', quality });
+        } else {
+          const nh = await page.evaluate(() => document.body.scrollHeight);
+          buf = await page.screenshot({ type: 'jpeg', quality, clip: { x: 0, y: 0, width: 750, height: nh } });
+        }
       }
       console.log(`[screenshot] 1x quality=${quality}, 大小: ${(buf.length/1024/1024).toFixed(2)}MB`);
     }
