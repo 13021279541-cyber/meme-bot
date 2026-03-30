@@ -12,8 +12,12 @@ const crypto = require('crypto');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
+const API_VERSION = '2026-03-30-v3'; // 用于前端校验后端代码是否已更新
 
 const app = express();
+
+// GET /version - 返回 API 版本号，供前端校验
+app.get('/version', (req, res) => res.json({ version: API_VERSION }));
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
@@ -235,6 +239,7 @@ async function callAibotClient(path, body) {
 app.post('/screenshot-report', async (req, res) => {
   try {
     const { startDate, endDate, chatid, chat_type, html: reportHtml } = req.body;
+    console.log(`[screenshot] 收到请求: startDate=${startDate}, endDate=${endDate}, html长度=${reportHtml ? reportHtml.length : 0}, 有html=${!!reportHtml}`);
     if (!startDate || !endDate) {
       return res.status(400).json({ ok: false, error: 'startDate 和 endDate 不能为空' });
     }

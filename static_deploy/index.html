@@ -2285,6 +2285,20 @@ window.addEventListener('load', function() {
     pushBtn.textContent = '⏳ 推送中（' + selectedChats.length + ' 个群）...';
 
     try {
+      // ===== 校验后端版本（防止 CVM 代码未更新导致截图/推送错误）=====
+      const REQUIRED_API_VERSION = '2026-03-30-v3';
+      try {
+        const verRes = await fetch('/version');
+        const verData = await verRes.json();
+        if (verData.version !== REQUIRED_API_VERSION) {
+          showToast('⚠️ 服务端代码版本不匹配（当前: ' + (verData.version || '未知') + '，需要: ' + REQUIRED_API_VERSION + '），请联系运维部署最新代码', 'error');
+          return;
+        }
+      } catch (verErr) {
+        showToast('⚠️ 无法校验服务端版本（可能代码太旧），请确认已部署最新代码后重试', 'error');
+        return;
+      }
+
       // ===== 构建 markdown =====
       var mdLines = ['**🔥 热梗洞察周报** | ' + startDate + ' ~ ' + endDate, ''];
       memes.forEach(function(m, i) {
@@ -2306,6 +2320,7 @@ window.addEventListener('load', function() {
 
       // ===== 生成 mobile 版周报 HTML（用勾选的梗）=====
       const mobileHtml = generateMobileReportHTML(memes, startDate, endDate);
+      console.log('[推送诊断] selectedChats:', selectedChats, 'memes数量:', memes.length, 'html长度:', mobileHtml.length, 'html包含m-root:', mobileHtml.includes('m-root'), 'html包含m-cover:', mobileHtml.includes('m-cover'));
 
       // ===== 截图一次（传 HTML 给服务端，不再让服务端重新渲染） =====
       pushBtn.textContent = '⏳ 截图生成中...';
