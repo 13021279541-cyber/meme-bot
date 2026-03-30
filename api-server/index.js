@@ -242,8 +242,8 @@ app.post('/screenshot-report', async (req, res) => {
     const puppeteer = require('puppeteer-core');
     const crypto = require('crypto');
 
-    const reportUrl = `http://127.0.0.1:3000/?report=${startDate}_${endDate}`;
-    console.log('[screenshot] 截图 URL:', reportUrl);
+    const reportUrl = `http://127.0.0.1:3000/?report=${startDate}_${endDate}&mobile=1`;
+    console.log('[screenshot] 截图 URL (mobile):', reportUrl);
 
     const browser = await puppeteer.launch({
       executablePath: '/usr/bin/ungoogled-chromium',
@@ -259,58 +259,84 @@ app.post('/screenshot-report', async (req, res) => {
     });
 
     const page = await browser.newPage();
-    // 16:9 宽屏匹配周报布局（1920x1080，1.5x 清晰度）
-    await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1.5 });
+    // 手机版 750px 宽，2x 清晰度
+    await page.setViewport({ width: 750, height: 1334, deviceScaleFactor: 2 });
     await page.goto(reportUrl, { waitUntil: 'networkidle0', timeout: 30000 });
 
-    // 等待报告内容+图片渲染完成
-    await new Promise(r => setTimeout(r, 3500));
+    // 等待内容+图片渲染完成
+    await new Promise(r => setTimeout(r, 4000));
 
-    // 截取完整页面，自动压缩到 2MB 以内（企微限制）
-    const MAX_SIZE = 2 * 1024 * 1024; // 2MB
-    let quality = 82;
-    let screenshotBuffer = await page.screenshot({
-      fullPage: true,
-      type: 'jpeg',
-      quality
-    });
-    console.log(`[screenshot] 首次截图 quality=${quality}, 大小: ${(screenshotBuffer.length / 1024 / 1024).toFixed(2)}MB`);
-
-    // 如果超 2MB，逐步降低质量重新截图
-    while (screenshotBuffer.length > MAX_SIZE && quality > 30) {
-      quality -= 10;
-      console.log(`[screenshot] 超过2MB，降低质量重试 quality=${quality}`);
-      screenshotBuffer = await page.screenshot({
-        fullPage: true,
-        type: 'jpeg',
-        quality
-      });
-      console.log(`[screenshot] 重试结果 quality=${quality}, 大小: ${(screenshotBuffer.length / 1024 / 1024).toFixed(2)}MB`);
-    }
-
-    await browser.close();
-
-    console.log('[screenshot] 截图完成，大小:', screenshotBuffer.length, 'bytes');
-
-    // ===== 保存截图到 public 目录，生成公开 URL =====
+    // ===== 全页面一张图截图 =====
+    // 两列布局紧凑排版，整页截成一张图推送
     const fs = require('fs');
     const screenshotDir = path.join(__dirname, 'public', 'screenshots');
     if (!fs.existsSync(screenshotDir)) fs.mkdirSync(screenshotDir, { recursive: true });
 
-    const filename = `report_${startDate}_${endDate}_${Date.now()}.jpg`;
-    const filepath = path.join(screenshotDir, filename);
-    fs.writeFileSync(filepath, screenshotBuffer);
+    const totalHeight = await page.evaluate(() => document.body.scrollHeight);
+    console.log(`[screenshot] 页面总高度: ${totalHeight}px`);
 
+    const MAX_SIZE = 2 * 1024 * 1024;
+    let quality = 85;
+    let buf = await page.screenshot({ type: 'jpeg', quality, fullPage: true });
+    console.log(`[screenshot] fullPage quality=${quality}, 大小: ${(buf.length/1024/1024).toFixed(2)}MB`);
+
+    // 超 2MB 则降质
+    while (buf.length > MAX_SIZE && quality > 30) {
+      quality -= 10;
+      buf = await page.screenshot({ type: 'jpeg', quality, fullPage: true });
+      console.log(`[screenshot] 降质 quality=${quality}, 大小: ${(buf.length/1024/1024).toFixed(2)}MB`);
+    }
+
+    // 如果降到30还超2MB，降低 deviceScaleFactor 重试
+    if (buf.length > MAX_SIZE) {
+      console.log('[screenshot] 2x仍超限，切换1x重试');
+      await page.setViewport({ width: 750, height: 1334, deviceScaleFactor: 1 });
+      await new Promise(r => setTimeout(r, 1000));
+      quality = 85;
+      buf = await page.screenshot({ type: 'jpeg', quality, fullPage: true });
+      while (buf.length > MAX_SIZE && quality > 30) {
+        quality -= 10;
+        buf = await page.screenshot({ type: 'jpeg', quality, fullPage: true });
+      }
+      console.log(`[screenshot] 1x quality=${quality}, 大小: ${(buf.length/1024/1024).toFixed(2)}MB`);
+    }
+
+    await browser.close();
+    console.log(`[screenshot] 截图完成，1 张`);
+
+    // 保存截图
     const serverHost = process.env.SERVER_HOST || `http://127.0.0.1:${PORT}`;
-    const imageUrl = `${serverHost}/screenshots/${filename}`;
-    const publicReportUrl = `${serverHost}/?report=${startDate}_${endDate}`;
+    const publicReportUrl = `${serverHost}/?report=${startDate}_${endDate}&mobile=1`;
+    const fname = `report_${startDate}_${endDate}_${Date.now()}.jpg`;
+    const fpath = path.join(screenshotDir, fname);
+    fs.writeFileSync(fpath, buf);
+    const imageInfos = [{ filename: fname, url: `${serverHost}/screenshots/${fname}`, size: buf.length, base64: buf.toString('base64') }];
 
-    console.log('[screenshot] 截图已保存，URL:', imageUrl);
+    console.log('[screenshot] 截图已保存，共', imageInfos.length, '张');
 
-    // ===== 通过 WebSocket 上传素材发真实图片 =====
-    const base64 = screenshotBuffer.toString('base64');
+    // ===== 逐张推送到企微群 =====
+    const sendToChat = async (chatid, chatType) => {
+      const results = [];
+      for (let i = 0; i < imageInfos.length; i++) {
+        try {
+          const r = await callAibotClient('/upload-and-send', {
+            chatid, chat_type: chatType || 2,
+            base64: imageInfos[i].base64,
+            filename: imageInfos[i].filename,
+            filetype: 'image'
+          });
+          results.push({ page: i + 1, ok: true, result: r });
+        } catch (e) {
+          results.push({ page: i + 1, ok: false, error: e.message });
+        }
+        // 间隔 1.5s 防企微丢消息
+        if (i < imageInfos.length - 1) {
+          await new Promise(r => setTimeout(r, 1500));
+        }
+      }
+      return results;
+    };
 
-    // 支持广播：不传 chatid 时获取群列表，逐群上传发送
     if (!chatid) {
       // 广播到所有群
       const httpLib = require('http');
@@ -322,30 +348,20 @@ app.post('/screenshot-report', async (req, res) => {
         }).on('error', () => resolve({ chats: [] }));
       });
       const chats = (chatsResp.chats || []).filter(c => c.authenticated);
-      const results = [];
+      const allResults = [];
       for (const chat of chats) {
-        try {
-          const r = await callAibotClient('/upload-and-send', {
-            chatid: chat.chatid,
-            chat_type: chat_type || 2,
-            base64, filename, filetype: 'image'
-          });
-          results.push({ chatid: chat.chatid, name: chat.name, ok: true, result: r });
-          // 间隔 1.5s 防企微丢消息
-          if (chats.indexOf(chat) < chats.length - 1) {
-            await new Promise(r => setTimeout(r, 1500));
-          }
-        } catch (e) {
-          results.push({ chatid: chat.chatid, name: chat.name, ok: false, error: e.message });
+        const chatResults = await sendToChat(chat.chatid, chat_type);
+        allResults.push({ chatid: chat.chatid, name: chat.name, pages: chatResults });
+        // 群间间隔
+        if (chats.indexOf(chat) < chats.length - 1) {
+          await new Promise(r => setTimeout(r, 2000));
         }
       }
-      res.json({ ok: true, broadcast: true, size: screenshotBuffer.length, imageUrl, results });
+      res.json({ ok: true, broadcast: true, totalPages: imageInfos.length, images: imageInfos.map(i => ({ url: i.url, size: i.size })), results: allResults });
     } else {
       // 单群发送
-      const result = await callAibotClient('/upload-and-send', {
-        chatid, chat_type: chat_type || 2, base64, filename, filetype: 'image'
-      });
-      res.json({ ok: true, size: screenshotBuffer.length, imageUrl, result });
+      const results = await sendToChat(chatid, chat_type);
+      res.json({ ok: true, totalPages: imageInfos.length, images: imageInfos.map(i => ({ url: i.url, size: i.size })), results });
     }
   } catch (e) {
     console.error('[screenshot] 错误:', e.message);

@@ -1661,6 +1661,305 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     return html;
   }
 
+  // ===== 手机版周报（推送群聊用，竖版750px宽，单列大卡片） =====
+  function generateMobileReportHTML(memes, startDate, endDate) {
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const dateRange = s.getFullYear() + '年 ' + (s.getMonth()+1) + '月' + s.getDate() + '日 ~ ' + (e.getMonth()+1) + '月' + e.getDate() + '日';
+    const PLACEHOLDER_EMOJIS = ['🔥','💀','😂','🤡','👀','💅','🐶','🌶️','⚡','🎭','🤯','😎'];
+
+    // 等级颜色映射
+    const priorityColors = { red: '#ef4444', orange: '#f59e0b', blue: '#3b82f6' };
+    const priorityLabels = { red: '🔴 必上', orange: '🟠 推荐', blue: '🔵 可选' };
+
+    // ========== 自适应排版引擎 ==========
+    // 目标：总图片高度尽量控制在 ~4500px 以内（2x JPEG q85 约 2MB）
+    const n = memes.length;
+    let layout, imgH, showWordCloud, showSummary, showFollow, coverPadding, titleSize, cardNameSize, cardSummarySize, cols, cardGap, listPad;
+
+    if (n <= 4) {
+      // 宽松模式：两列大卡片，完整封面
+      layout = 'grid'; cols = 2; imgH = 280;
+      showWordCloud = true; showSummary = true; showFollow = true;
+      coverPadding = '48px 40px 40px'; titleSize = 52;
+      cardNameSize = 24; cardSummarySize = 18;
+      cardGap = 16; listPad = '24px 20px';
+    } else if (n <= 8) {
+      // 标准模式：两列卡片，图片缩小，封面去词云
+      layout = 'grid'; cols = 2; imgH = 180;
+      showWordCloud = false; showSummary = true; showFollow = true;
+      coverPadding = '36px 40px 28px'; titleSize = 44;
+      cardNameSize = 22; cardSummarySize = 16;
+      cardGap = 12; listPad = '16px 16px';
+    } else if (n <= 14) {
+      // 紧凑模式：两列小卡片，图片更小，无词云无描述
+      layout = 'grid'; cols = 2; imgH = 120;
+      showWordCloud = false; showSummary = false; showFollow = false;
+      coverPadding = '28px 40px 20px'; titleSize = 40;
+      cardNameSize = 20; cardSummarySize = 14;
+      cardGap = 10; listPad = '12px 12px';
+    } else {
+      // 列表模式：一行一梗，缩略图
+      layout = 'list'; cols = 1; imgH = 60;
+      showWordCloud = false; showSummary = false; showFollow = false;
+      coverPadding = '24px 40px 16px'; titleSize = 36;
+      cardNameSize = 20; cardSummarySize = 14;
+      cardGap = 8; listPad = '12px 16px';
+    }
+
+    // 词云（仅在 showWordCloud 时生成）
+    let wordCloudHTML = '';
+    if (showWordCloud) {
+      const wordCloudItems = memes.map((m, i) => {
+        const ratio = i / memes.length;
+        let size = ratio < 0.2 ? 1 : ratio < 0.4 ? 2 : ratio < 0.6 ? 3 : ratio < 0.8 ? 4 : 5;
+        return { name: m.name, size: size };
+      });
+      for (let i = wordCloudItems.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [wordCloudItems[i], wordCloudItems[j]] = [wordCloudItems[j], wordCloudItems[i]];
+      }
+      wordCloudHTML = `<div class="word-cloud">` +
+        wordCloudItems.map(w => `<span class="word s${w.size}">${escapeHtml(w.name)}</span>`).join('') +
+        `</div>`;
+    }
+
+    // 卡片宽度
+    const cardWidth = layout === 'list'
+      ? '100%'
+      : (cols === 2 ? `calc(50% - ${cardGap/2}px)` : `calc(33.33% - ${cardGap*2/3}px)`);
+
+    let html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=750">
+<title>🔥 热梗周报</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif; background: #f5f5f7; color: #1d1d1f; width: 750px; overflow: hidden; }
+
+  /* ===== 封面 ===== */
+  .m-cover {
+    width: 750px; position: relative; overflow: hidden;
+    background: linear-gradient(160deg, #6366f1 0%, #8b5cf6 35%, #a855f7 65%, #d946ef 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; color: white; padding: ${coverPadding};
+  }
+  .m-cover h1 { font-size: ${titleSize}px; font-weight: 900; letter-spacing: 4px; text-shadow: 0 2px 16px rgba(0,0,0,0.15); }
+  .m-cover .date { font-size: ${Math.round(titleSize*0.5)}px; margin-top: ${showWordCloud ? 14 : 10}px; opacity: 0.8; font-weight: 500; }
+  .m-cover .count { font-size: ${Math.round(titleSize*0.42)}px; margin-top: 6px; opacity: 0.6; }
+  .m-cover .word-cloud { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 16px; max-width: 650px; margin-top: 36px; }
+  .m-cover .word { font-weight: 700; line-height: 1.3; }
+  .m-cover .word.s1 { font-size: 38px; }
+  .m-cover .word.s2 { font-size: 32px; }
+  .m-cover .word.s3 { font-size: 26px; }
+  .m-cover .word.s4 { font-size: 22px; }
+  .m-cover .word.s5 { font-size: 18px; }
+  .m-cover .word:nth-child(6n+1) { color: rgba(255,255,255,0.9); }
+  .m-cover .word:nth-child(6n+2) { color: rgba(253,224,71,0.85); }
+  .m-cover .word:nth-child(6n+3) { color: rgba(147,197,253,0.85); }
+  .m-cover .word:nth-child(6n+4) { color: rgba(249,168,212,0.85); }
+  .m-cover .word:nth-child(6n+5) { color: rgba(167,243,208,0.85); }
+  .m-cover .word:nth-child(6n+6) { color: rgba(253,186,116,0.85); }
+  .m-cover .team { margin-top: ${showWordCloud ? 28 : 16}px; font-size: ${showWordCloud ? 20 : 18}px; opacity: 0.5; letter-spacing: 3px; }
+
+  /* ===== 分隔符 ===== */
+  .m-divider {
+    width: 750px; padding: ${showWordCloud ? '32px 40px' : '20px 40px'}; background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+  }
+  .m-divider .line { flex: 1; height: 1px; background: rgba(255,255,255,0.3); }
+  .m-divider .text { font-size: ${showWordCloud ? 20 : 18}px; color: rgba(255,255,255,0.85); font-weight: 600; letter-spacing: 2px; white-space: nowrap; }
+
+  /* ===== 卡片列表区 ===== */
+  .m-list { width: 750px; padding: ${listPad}; background: #f5f5f7; display: flex; flex-wrap: wrap; gap: ${cardGap}px; }
+
+  /* --- 网格卡片模式 --- */
+  .m-card {
+    width: ${cardWidth}; background: white; border-radius: ${layout === 'list' ? 10 : 14}px; overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.04);
+    position: relative; display: flex; flex-direction: ${layout === 'list' ? 'row' : 'column'};
+  }
+  .m-card .top-bar { height: ${layout === 'list' ? 0 : 4}px; ${layout === 'list' ? 'display:none;' : ''} }
+  .m-card:nth-child(4n+1) .top-bar { background: linear-gradient(90deg, #6366f1, #8b5cf6); }
+  .m-card:nth-child(4n+2) .top-bar { background: linear-gradient(90deg, #ec4899, #f43f5e); }
+  .m-card:nth-child(4n+3) .top-bar { background: linear-gradient(90deg, #06b6d4, #3b82f6); }
+  .m-card:nth-child(4n+4) .top-bar { background: linear-gradient(90deg, #10b981, #34d399); }
+
+  .m-card .card-idx {
+    position: absolute; top: ${layout === 'list' ? 4 : 8}px; right: ${layout === 'list' ? 8 : 10}px; font-size: ${layout === 'list' ? 24 : 36}px; font-weight: 900;
+    color: rgba(99,102,241,0.06); line-height: 1; z-index: 1;
+  }
+
+  .m-card .img-wrap {
+    ${layout === 'list' ? `width: ${imgH}px; min-width: ${imgH}px; height: ${imgH}px;` : `width: 100%; height: ${imgH}px;`}
+    overflow: hidden; background: #f8f9fc; position: relative; ${layout === 'list' ? 'border-radius: 10px 0 0 10px;' : ''}
+  }
+  .m-card .img-wrap img {
+    width: 100%; height: 100%; display: block; object-fit: cover;
+  }
+  .m-card .no-img {
+    ${layout === 'list' ? `width: ${imgH}px; height: ${imgH}px;` : `width: 100%; height: ${imgH}px;`}
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+    display: flex; align-items: center; justify-content: center; font-size: ${layout === 'list' ? 28 : 48}px;
+  }
+
+  .m-card .badge-row {
+    position: absolute; top: ${layout === 'list' ? 4 : 8}px; left: ${layout === 'list' ? 4 : 8}px; display: flex; gap: 4px; z-index: 2; flex-wrap: wrap;
+  }
+  .m-card .cat-badge {
+    padding: 2px ${layout === 'list' ? 4 : 8}px; border-radius: 12px; font-size: ${layout === 'list' ? 11 : 16}px; font-weight: 700;
+    backdrop-filter: blur(8px); box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  }
+  .m-card .cat-wz { background: rgba(99,102,241,0.9); color: white; }
+  .m-card .cat-pub { background: rgba(249,115,22,0.9); color: white; }
+  .m-card .pri-badge {
+    padding: 2px ${layout === 'list' ? 4 : 8}px; border-radius: 12px; font-size: ${layout === 'list' ? 11 : 16}px; font-weight: 700;
+    backdrop-filter: blur(8px); box-shadow: 0 1px 4px rgba(0,0,0,0.12); color: white;
+  }
+
+  .m-card .body { padding: ${layout === 'list' ? '8px 10px' : '14px 14px 12px'}; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+  .m-card .name {
+    font-size: ${cardNameSize}px; font-weight: 800; line-height: 1.3; color: #1d1d1f;
+    margin-bottom: ${layout === 'list' ? 4 : 8}px; display: -webkit-box; -webkit-line-clamp: ${layout === 'list' ? 1 : 2};
+    -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .m-card .name a { color: #1d1d1f; text-decoration: none; }
+  .m-card .summary {
+    font-size: ${cardSummarySize}px; color: #6b7280; line-height: 1.5; margin-bottom: ${layout === 'list' ? 4 : 10}px;
+    display: -webkit-box; -webkit-line-clamp: ${layout === 'list' ? 1 : 2}; -webkit-box-orient: vertical; overflow: hidden;
+    flex: 1;
+  }
+
+  .m-card .follow-row {
+    padding-top: 8px; border-top: 1px dashed #e5e7eb; font-size: 16px;
+  }
+  .m-card .follow-item { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .m-card .follow-tag {
+    padding: 2px 8px; border-radius: 6px; font-weight: 700; white-space: nowrap; font-size: 14px;
+  }
+  .m-card .follow-tag.official { background: #dbeafe; color: #1d4ed8; }
+  .m-card .follow-tag.incentive { background: #fef3c7; color: #d97706; }
+  .m-card .follow-link { color: #6366f1; text-decoration: none; font-size: 16px; }
+
+  .m-card .foot {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-top: ${layout === 'list' ? 4 : 8}px; border-top: 1px solid #f3f4f6; margin-top: auto;
+  }
+  .m-card .source {
+    font-size: ${layout === 'list' ? 14 : 16}px; color: #6366f1; text-decoration: none;
+    padding: 3px ${layout === 'list' ? 6 : 10}px; background: rgba(99,102,241,0.08); border-radius: 12px;
+  }
+  .m-card .date { font-size: ${layout === 'list' ? 12 : 14}px; color: #9ca3af; }
+
+  /* ===== 尾部 ===== */
+  .m-footer {
+    width: 750px; padding: ${n <= 4 ? '40px 28px' : '24px 28px'}; text-align: center;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white;
+  }
+  .m-footer .logo { font-size: ${n <= 4 ? 36 : 24}px; margin-bottom: 6px; }
+  .m-footer .text { font-size: ${n <= 4 ? 20 : 16}px; opacity: 0.7; }
+
+  /* 排版模式标注（调试用，正式截图不显示） */
+  .m-layout-hint { display: none; }
+</style>
+</head>
+<body>
+
+<!-- 封面 -->
+<div class="m-cover">
+  <h1>热梗洞察周报</h1>
+  <div class="date">${escapeHtml(dateRange)}</div>
+  <div class="count">本期共收录 ${memes.length} 条热梗</div>
+  ${wordCloudHTML}
+  <div class="team">by 用户社区组</div>
+</div>
+
+<!-- 分隔符 -->
+<div class="m-divider">
+  <div class="line"></div>
+  <div class="text">🔥 本周热梗精选</div>
+  <div class="line"></div>
+</div>
+
+<!-- 卡片列表 -->
+<div class="m-list">`;
+
+    memes.forEach((meme, idx) => {
+      const created = new Date(meme.created_at);
+      const dateDisplay = (created.getMonth()+1) + '/' + created.getDate();
+      const emoji = PLACEHOLDER_EMOJIS[Math.floor(Math.random() * PLACEHOLDER_EMOJIS.length)];
+      const imgSrc = meme.image_path && meme.image_path.startsWith('http') ? meme.image_path : '';
+      const priColor = priorityColors[meme.priority] || '#9ca3af';
+      const priLabel = priorityLabels[meme.priority] || '';
+
+      html += `<div class="m-card">
+    <div class="top-bar"></div>
+    <span class="card-idx">#${idx + 1}</span>`;
+
+      // 图片区 + badges
+      const badgeHTML = `<div class="badge-row">${
+        meme.category === 'wangzhe'
+          ? `<span class="cat-badge cat-wz">🎮 王者相关</span>`
+          : `<span class="cat-badge cat-pub">🌐 大众热点</span>`
+      }${priLabel ? `<span class="pri-badge" style="background:${priColor}">${priLabel}</span>` : ''}</div>`;
+
+      if (imgSrc) {
+        html += `<div class="img-wrap">${badgeHTML}<img src="${imgSrc}" loading="lazy" /></div>`;
+      } else {
+        html += `<div class="img-wrap">${badgeHTML}<div class="no-img">${emoji}</div></div>`;
+      }
+
+      html += `<div class="body">
+      <div class="name">${meme.source_url ? `<a href="${escapeHtml(meme.source_url)}" target="_blank">${escapeHtml(meme.name)}</a>` : escapeHtml(meme.name)}</div>`;
+
+      if (showSummary && meme.summary) {
+        html += `<div class="summary">${escapeHtml(meme.summary)}</div>`;
+      }
+
+      // 跟进信息（仅在 showFollow 时显示）
+      if (showFollow && (meme.official_title || meme.official_link || meme.incentive_topic || meme.incentive_link)) {
+        html += `<div class="follow-row">`;
+        if (meme.official_title || meme.official_link) {
+          html += `<div class="follow-item"><span class="follow-tag official">📢 官号跟进</span>`;
+          if (meme.official_title) html += `<span style="color:#374151">${escapeHtml(meme.official_title)}</span>`;
+          if (meme.official_link) html += `<a class="follow-link" href="${escapeHtml(meme.official_link)}" target="_blank">查看→</a>`;
+          html += `</div>`;
+        }
+        if (meme.incentive_topic || meme.incentive_link) {
+          html += `<div class="follow-item"><span class="follow-tag incentive">🎯 作者激励</span>`;
+          if (meme.incentive_topic) html += `<span style="color:#374151">${escapeHtml(meme.incentive_topic)}</span>`;
+          if (meme.incentive_link) html += `<a class="follow-link" href="${escapeHtml(meme.incentive_link)}" target="_blank">优质作品→</a>`;
+          html += `</div>`;
+        }
+        html += `</div>`;
+      }
+
+      html += `<div class="foot">`;
+      if (meme.source_url) {
+        html += `<a class="source" href="${escapeHtml(meme.source_url)}" target="_blank">🔗 原视频</a>`;
+      } else {
+        html += `<span></span>`;
+      }
+      html += `<span class="date">${dateDisplay}</span>
+      </div>
+    </div>
+  </div>`;
+    });
+
+    html += `</div>
+
+<!-- 尾部 -->
+<div class="m-footer">
+  <div class="logo">🔥</div>
+  <div class="text">热梗洞察 · 用户社区组</div>
+</div>
+
+</body></html>`;
+    return html;
+  }
+
   // 预览
   document.getElementById('btn-preview-report').addEventListener('click', async function() {
     const startDate = document.getElementById('report-start').value;
@@ -1895,10 +2194,15 @@ window.addEventListener('load', function() {
       // 创建周报展示容器
       const reportView = document.createElement('div');
       reportView.id = 'report-fullview';
+      reportView.style.cssText = 'max-width:750px;margin:0 auto;overflow:hidden;';
       reportView.innerHTML = '<div style="text-align:center;padding:40px 20px"><div class="spinner"></div><p style="margin-top:12px;color:#999">加载周报中...</p></div>';
       document.querySelector('.container').appendChild(reportView);
+      document.body.style.overflowX = 'hidden';
 
-      // 加载数据并渲染（使用与预览相同的 generateReportHTML 生成 16:9 四列布局）
+      // 检测是否手机版
+      const isMobileReport = urlParams.get('mobile') === '1';
+
+      // 加载数据并渲染
       (async function() {
         try {
           const memes = await apiGet('/memes?start_date=' + rStart + '&end_date=' + rEnd);
@@ -1912,8 +2216,10 @@ window.addEventListener('load', function() {
           const priorityOrder = { red: 0, orange: 1, blue: 2, '': 3 };
           filtered.sort((a, b) => (priorityOrder[a.priority || ''] || 3) - (priorityOrder[b.priority || ''] || 3));
 
-          // 直接用 generateReportHTML 生成完整 16:9 周报
-          const fullHtml = generateReportHTML(filtered, rStart, rEnd);
+          // 手机版或PC版
+          const fullHtml = isMobileReport
+            ? generateMobileReportHTML(filtered, rStart, rEnd)
+            : generateReportHTML(filtered, rStart, rEnd);
 
           // 提取 <body> 内容和 <style> 内容，注入当前页面
           const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
