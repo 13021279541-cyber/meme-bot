@@ -1998,7 +1998,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   window._fetchedMemes = []; // 筛选出的全部梗（含灰色）
   window._selectedMemeIds = new Set(); // 勾选的梗 ID
 
-  function toggleAllMemes(checked) {
+  window.toggleAllMemes = function(checked) {
     window._selectedMemeIds.clear();
     if (checked) {
       window._fetchedMemes.forEach(m => { if (m.priority !== 'gray') window._selectedMemeIds.add(String(m.id)); });
@@ -2007,7 +2007,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       cb.checked = checked && cb.closest('.meme-pick-item').dataset.priority !== 'gray';
     });
     updatePickerSummary();
-  }
+  };
 
   function updatePickerSummary() {
     const total = window._fetchedMemes.length;
@@ -2056,14 +2056,14 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     updatePickerSummary();
   }
 
-  function onMemeCheckChange(cb, id) {
+  window.onMemeCheckChange = function(cb, id) {
     if (cb.checked) {
       window._selectedMemeIds.add(String(id));
     } else {
       window._selectedMemeIds.delete(String(id));
     }
     updatePickerSummary();
-  }
+  };
 
   // ===== 第一步：筛选热梗 =====
   document.getElementById('btn-fetch-memes').addEventListener('click', async function() {
@@ -2249,11 +2249,11 @@ window.addEventListener('load', function() {
     }
   }
 
-  function onChatCheckChange(cb) {
+  window.onChatCheckChange = function(cb) {
     const chatid = cb.dataset.chatid;
     if (cb.checked) window._selectedChatIds.add(chatid);
     else window._selectedChatIds.delete(chatid);
-  }
+  };
 
   // ===== 推送到企微：先弹群选择弹窗 =====
   document.getElementById('btn-push-wecom').addEventListener('click', async function() {
