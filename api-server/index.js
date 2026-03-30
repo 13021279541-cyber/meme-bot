@@ -263,7 +263,12 @@ app.post('/screenshot-report', async (req, res) => {
     await page.setViewport({ width: 750, height: 1334, deviceScaleFactor: 2 });
     await page.goto(reportUrl, { waitUntil: 'networkidle0', timeout: 30000 });
 
-    // 等待内容+图片渲染完成
+    // 等待 document.write 完成（手机版会替换整个页面）+ 图片渲染
+    await page.waitForFunction(() => {
+      // 等待页面有实际内容（封面元素出现）
+      return document.querySelector('.m-cover') || document.querySelector('.report-page');
+    }, { timeout: 15000 }).catch(() => {});
+    // 再等图片加载完成
     await new Promise(r => setTimeout(r, 4000));
 
     // ===== 全页面一张图截图 =====

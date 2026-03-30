@@ -2221,7 +2221,15 @@ window.addEventListener('load', function() {
             ? generateMobileReportHTML(filtered, rStart, rEnd)
             : generateReportHTML(filtered, rStart, rEnd);
 
-          // 提取 <body> 内容和 <style> 内容，注入当前页面
+          if (isMobileReport) {
+            // 手机版：直接替换整个页面，避免主页面 CSS 干扰
+            document.open();
+            document.write(fullHtml);
+            document.close();
+            return;
+          }
+
+          // PC版：提取 <body> 内容和 <style> 内容，注入当前页面
           const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
           const styleMatch = fullHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
 
