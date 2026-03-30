@@ -625,13 +625,41 @@
         <div style="font-size:12px;color:#aaa;margin-top:6px">默认上周一到今天，可手动调整</div>
       </div>
 
+      <button type="button" class="submit-btn" id="btn-fetch-memes" style="margin-bottom:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6)">🔍 筛选热梗</button>
+
+      <!-- 梗列表选择区 -->
+      <div id="meme-picker" style="display:none;margin-bottom:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:13px;color:#888" id="meme-picker-summary"></div>
+          <div style="display:flex;gap:8px">
+            <button type="button" onclick="toggleAllMemes(true)" style="font-size:12px;padding:4px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;color:#555">全选</button>
+            <button type="button" onclick="toggleAllMemes(false)" style="font-size:12px;padding:4px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;color:#555">全不选</button>
+          </div>
+        </div>
+        <div id="meme-picker-list" style="max-height:400px;overflow-y:auto;border:1px solid #eee;border-radius:12px;background:#fafbfc"></div>
+        <div style="font-size:12px;color:#aaa;margin-top:6px">取消勾选 = 本次不推送（不影响梗的等级）</div>
+      </div>
+
       <div id="report-summary" style="background:#f8f9fc;border-radius:12px;padding:16px 18px;margin-bottom:18px;display:none">
         <div style="font-size:13px;color:#888" id="report-summary-text"></div>
       </div>
 
-      <button type="button" class="submit-btn" id="btn-preview-report" style="margin-bottom:10px">👀 预览周报</button>
+      <button type="button" class="submit-btn" id="btn-preview-report" style="margin-bottom:10px;display:none">👀 预览周报</button>
       <button type="button" class="submit-btn" id="btn-download-report" style="background:linear-gradient(135deg,#43e97b,#38f9d7);box-shadow:0 4px 16px rgba(67,233,123,0.3);display:none">📥 下载 HTML 周报</button>
       <button type="button" class="submit-btn" id="btn-push-wecom" style="background:linear-gradient(135deg,#3b82f6,#8b5cf6);box-shadow:0 4px 16px rgba(59,130,246,0.3);display:none;margin-top:10px">📣 推送到企微群</button>
+
+      <!-- 群选择弹窗 -->
+      <div id="chat-picker-modal" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px)" onclick="if(event.target===this)this.style.display='none'">
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:16px;padding:24px;min-width:320px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+          <div style="font-size:16px;font-weight:700;margin-bottom:16px">📣 选择推送目标群</div>
+          <div id="chat-picker-list" style="margin-bottom:16px"></div>
+          <div id="chat-picker-error" style="display:none;color:#ef4444;font-size:13px;margin-bottom:10px"></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button type="button" onclick="document.getElementById('chat-picker-modal').style.display='none'" style="padding:8px 18px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;color:#555;font-size:14px">取消</button>
+            <button type="button" id="btn-confirm-push" style="padding:8px 18px;border:none;border-radius:8px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:white;cursor:pointer;font-size:14px;font-weight:600">确认推送</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="report-preview-frame" style="margin-top:20px;display:none">
@@ -1065,11 +1093,11 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
           html += '<div class="priority-dots" data-id="' + m.id + '">';
           ['red','orange','blue','gray'].forEach(c => {
             html += '<span class="priority-dot dot-' + c + (pri === c ? ' active' : '') + '" data-priority="' + c + '" title="' +
-              ({red:'🔴 必上',orange:'🟠 推荐',blue:'🔵 可选',gray:'⚪ 不上报'}[c]) + '"></span>';
+              ({red:'🔴 重点',orange:'🟠 上升',blue:'🔵 观察',gray:'⚪ 待定'}[c]) + '"></span>';
           });
           html += '</div>';
         } else if (pri) {
-          const priLabel = {red:'🔴 必上',orange:'🟠 推荐',blue:'🔵 可选'}[pri] || '';
+          const priLabel = {red:'🔴 重点',orange:'🟠 上升',blue:'🔵 观察'}[pri] || '';
           if (priLabel) html += '<span class="tag-btn" style="cursor:default;font-size:11px">' + priLabel + '</span>';
         }
         html += '</div>';
@@ -1670,7 +1698,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
 
     // 等级颜色映射
     const priorityColors = { red: '#ef4444', orange: '#f59e0b', blue: '#3b82f6' };
-    const priorityLabels = { red: '🔴 必上', orange: '🟠 推荐', blue: '🔵 可选' };
+    const priorityLabels = { red: '🔴 重点', orange: '🟠 上升', blue: '🔵 观察' };
 
     // ========== 自适应排版引擎 ==========
     // 目标：总图片高度尽量控制在 ~4500px 以内（2x JPEG q85 约 2MB）
@@ -1961,37 +1989,130 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   }
 
   // 预览
-  document.getElementById('btn-preview-report').addEventListener('click', async function() {
+  // ===== 等级名称映射（全局复用） =====
+  const PRIORITY_LABELS = {red:'🔴 重点',orange:'🟠 上升',blue:'🔵 观察',gray:'⚪ 待定'};
+  const PRIORITY_ORDER = { red: 0, orange: 1, blue: 2, '': 3 };
+
+  // 梗列表选择相关状态
+  window._fetchedMemes = []; // 筛选出的全部梗（含灰色）
+  window._selectedMemeIds = new Set(); // 勾选的梗 ID
+
+  function toggleAllMemes(checked) {
+    window._selectedMemeIds.clear();
+    if (checked) {
+      window._fetchedMemes.forEach(m => { if (m.priority !== 'gray') window._selectedMemeIds.add(m.id); });
+    }
+    document.querySelectorAll('#meme-picker-list input[type="checkbox"]').forEach(cb => {
+      cb.checked = checked && cb.closest('.meme-pick-item').dataset.priority !== 'gray';
+    });
+    updatePickerSummary();
+  }
+
+  function updatePickerSummary() {
+    const total = window._fetchedMemes.length;
+    const selected = window._selectedMemeIds.size;
+    document.getElementById('meme-picker-summary').innerHTML =
+      '共 <b>' + total + '</b> 条梗，已选 <b style="color:#6366f1">' + selected + '</b> 条';
+    // 预览按钮显示/隐藏
+    document.getElementById('btn-preview-report').style.display = selected > 0 ? 'block' : 'none';
+    // 隐藏之前的预览和推送按钮（重新筛选后需要重新预览）
+    document.getElementById('btn-download-report').style.display = 'none';
+    document.getElementById('btn-push-wecom').style.display = 'none';
+    document.getElementById('report-preview-frame').style.display = 'none';
+    document.getElementById('report-summary').style.display = 'none';
+  }
+
+  function renderMemePicker(memes) {
+    const list = document.getElementById('meme-picker-list');
+    const priOrder = PRIORITY_ORDER;
+    // 排序：按等级
+    memes.sort((a, b) => (priOrder[a.priority || ''] || 3) - (priOrder[b.priority || ''] || 3));
+    window._fetchedMemes = memes;
+    window._selectedMemeIds.clear();
+    // 默认勾选非灰色
+    memes.forEach(m => { if (m.priority !== 'gray') window._selectedMemeIds.add(m.id); });
+
+    let html = '';
+    memes.forEach(m => {
+      const pri = m.priority || '';
+      const priLabel = PRIORITY_LABELS[pri] || '';
+      const isGray = pri === 'gray';
+      const checked = !isGray;
+      const catLabel = m.category === 'wangzhe' ? '🎮' : '🌐';
+      const imgThumb = m.image_path && m.image_path.startsWith('http')
+        ? '<img src="' + m.image_path + '" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0">'
+        : '<div style="width:36px;height:36px;border-radius:6px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🔥</div>';
+      html += '<label class="meme-pick-item" data-priority="' + pri + '" data-id="' + m.id + '" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background 0.15s' + (isGray ? ';opacity:0.5' : '') + '">';
+      html += '<input type="checkbox"' + (checked ? ' checked' : '') + ' style="width:18px;height:18px;accent-color:#6366f1;flex-shrink:0" onchange="onMemeCheckChange(this,\'' + m.id + '\')">';
+      html += imgThumb;
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-size:14px;font-weight:600;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + catLabel + ' ' + escapeHtml(m.name) + '</div>';
+      html += '<div style="font-size:12px;color:#999;margin-top:2px">' + priLabel + (m.summary ? ' · ' + escapeHtml(m.summary).substring(0, 30) : '') + '</div>';
+      html += '</div>';
+      html += '</label>';
+    });
+    list.innerHTML = html;
+    updatePickerSummary();
+  }
+
+  function onMemeCheckChange(cb, id) {
+    if (cb.checked) {
+      window._selectedMemeIds.add(id);
+    } else {
+      window._selectedMemeIds.delete(id);
+    }
+    updatePickerSummary();
+  }
+
+  // ===== 第一步：筛选热梗 =====
+  document.getElementById('btn-fetch-memes').addEventListener('click', async function() {
     const startDate = document.getElementById('report-start').value;
     const endDate = document.getElementById('report-end').value;
     if (!startDate || !endDate) { showToast('请选择日期范围', 'error'); return; }
 
     this.disabled = true;
+    this.textContent = '⏳ 加载中...';
+    try {
+      const memes = await apiGet('/memes?start_date=' + startDate + '&end_date=' + endDate);
+      if (!memes || memes.length === 0) {
+        showToast('该时间范围内没有热梗', 'error');
+        document.getElementById('meme-picker').style.display = 'none';
+        return;
+      }
+      document.getElementById('meme-picker').style.display = 'block';
+      renderMemePicker(memes);
+      showToast('✅ 已加载 ' + memes.length + ' 条热梗', 'success');
+    } catch (err) {
+      showToast('❌ ' + (err.message || '加载失败'), 'error');
+    } finally {
+      this.disabled = false;
+      this.textContent = '🔍 筛选热梗';
+    }
+  });
+
+  // ===== 第二步：预览周报（用勾选的梗） =====
+  document.getElementById('btn-preview-report').addEventListener('click', async function() {
+    const startDate = document.getElementById('report-start').value;
+    const endDate = document.getElementById('report-end').value;
+    if (!startDate || !endDate) { showToast('请选择日期范围', 'error'); return; }
+
+    // 获取勾选的梗
+    const selectedIds = window._selectedMemeIds;
+    if (selectedIds.size === 0) { showToast('请至少选择一条热梗', 'error'); return; }
+
+    const filtered = window._fetchedMemes.filter(m => selectedIds.has(m.id));
+    filtered.sort((a, b) => (PRIORITY_ORDER[a.priority || ''] || 3) - (PRIORITY_ORDER[b.priority || ''] || 3));
+
+    this.disabled = true;
     this.textContent = '⏳ 生成中...';
 
     try {
-      // 从 API 查询
-      const startDt = startDate;
-      const endDt = endDate;
-      const memes = await apiGet('/memes?start_date=' + startDt + '&end_date=' + endDt);
-
-      // 过滤灰色
-      const filtered = (memes || []).filter(m => m.priority !== 'gray');
-      if (filtered.length === 0) {
-        showToast('该时间范围内没有可上报的热梗', 'error');
-        return;
-      }
-
-      // 按等级排序
-      const priorityOrder = { red: 0, orange: 1, blue: 2, '': 3 };
-      filtered.sort((a, b) => (priorityOrder[a.priority || ''] || 3) - (priorityOrder[b.priority || ''] || 3));
-
       // 生成 HTML
       lastReportHtml = generateReportHTML(filtered, startDate, endDate);
 
       // 显示摘要
       document.getElementById('report-summary-text').innerHTML =
-        '📊 范围 <b>' + startDate + '</b> ~ <b>' + endDate + '</b>　|　共 <b>' + filtered.length + '</b> 条热梗（已过滤灰色）';
+        '📊 范围 <b>' + startDate + '</b> ~ <b>' + endDate + '</b>　|　共 <b>' + filtered.length + '</b> 条热梗';
       document.getElementById('report-summary').style.display = 'block';
 
       // 预览
@@ -2083,23 +2204,84 @@ window.addEventListener('load', function() {
     showToast('📥 下载已开始', 'success');
   });
 
-  // ===== 推送到企微智能机器人（服务端自动截图推送）=====
+  // ===== 群名映射（按 chatid 首次出现顺序排序后匹配） =====
+  // 群名在前端维护，可随时扩展
+  const CHAT_NAMES = {
+    // 顺序：第一个录入的群 = 自测群，第二个 = 内部热点测试群
+    // 通过 order index 动态匹配（因为 chatid 可能变化）
+  };
+  let _chatNamesByOrder = ['自测群', '内部热点测试群']; // 按录入顺序匹配
+  window._selectedChatIds = new Set();
 
+  // 加载群列表
+  async function loadChatList() {
+    const listEl = document.getElementById('chat-picker-list');
+    const errEl = document.getElementById('chat-picker-error');
+    errEl.style.display = 'none';
+    listEl.innerHTML = '<div style="text-align:center;padding:16px;color:#999">⏳ 加载中...</div>';
+    try {
+      const res = await apiGet('/webhook/aibot/chats');
+      const chats = (res && res.chats) || [];
+      if (chats.length === 0) {
+        listEl.innerHTML = '<div style="padding:16px;color:#999;text-align:center">暂无可用群（请先在群里 @机器人 激活）</div>';
+        return;
+      }
+      window._selectedChatIds.clear();
+      let html = '';
+      chats.forEach((chat, idx) => {
+        const chatName = _chatNamesByOrder[idx] || ('群 ' + (idx + 1));
+        const isAuth = chat.authenticated;
+        const checked = isAuth;
+        if (isAuth) window._selectedChatIds.add(chat.chatid);
+        html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0;cursor:' + (isAuth ? 'pointer' : 'default') + (isAuth ? '' : ';opacity:0.4') + '">';
+        html += '<input type="checkbox"' + (checked ? ' checked' : '') + (isAuth ? '' : ' disabled') + ' data-chatid="' + chat.chatid + '" style="width:18px;height:18px;accent-color:#6366f1" onchange="onChatCheckChange(this)">';
+        html += '<div style="flex:1">';
+        html += '<div style="font-size:14px;font-weight:600;color:#333">' + escapeHtml(chatName) + '</div>';
+        html += '<div style="font-size:11px;color:#aaa;margin-top:2px">机器人: ' + escapeHtml(chat.name || chat.botId.substring(0, 10) + '...') + (isAuth ? ' ✅' : ' ❌ 未连接') + '</div>';
+        html += '</div></label>';
+      });
+      listEl.innerHTML = html;
+    } catch (err) {
+      listEl.innerHTML = '';
+      errEl.textContent = '加载群列表失败: ' + (err.message || '网络错误');
+      errEl.style.display = 'block';
+    }
+  }
+
+  function onChatCheckChange(cb) {
+    const chatid = cb.dataset.chatid;
+    if (cb.checked) window._selectedChatIds.add(chatid);
+    else window._selectedChatIds.delete(chatid);
+  }
+
+  // ===== 推送到企微：先弹群选择弹窗 =====
   document.getElementById('btn-push-wecom').addEventListener('click', async function() {
     const memes = window._lastReportMemes;
     if (!memes || memes.length === 0) { showToast('请先预览周报', 'error'); return; }
+    // 弹出群选择弹窗
+    document.getElementById('chat-picker-modal').style.display = 'block';
+    await loadChatList();
+  });
 
+  // ===== 确认推送 =====
+  document.getElementById('btn-confirm-push').addEventListener('click', async function() {
+    const memes = window._lastReportMemes;
     const startDate = window._lastReportStart;
     const endDate = window._lastReportEnd;
+    const selectedChats = [...window._selectedChatIds];
 
-    if (!confirm('确认推送 ' + memes.length + ' 条热梗到企微群？')) return;
+    if (selectedChats.length === 0) { showToast('请至少选择一个群', 'error'); return; }
 
-    this.disabled = true;
-    this.style.opacity = '0.7';
-    this.textContent = '⏳ 推送中...';
+    // 关闭弹窗
+    document.getElementById('chat-picker-modal').style.display = 'none';
+
+    const pushBtn = document.getElementById('btn-push-wecom');
+    pushBtn.disabled = true;
+    pushBtn.style.opacity = '0.7';
+    pushBtn.textContent = '⏳ 推送中（' + selectedChats.length + ' 个群）...';
 
     try {
-      // ===== 第一条：markdown 文字版（精简清单） =====
+      // ===== 构建 markdown =====
       var mdLines = ['**🔥 热梗洞察周报** | ' + startDate + ' ~ ' + endDate, ''];
       memes.forEach(function(m, i) {
         var line = (i + 1) + '. **' + m.name + '**';
@@ -2116,21 +2298,34 @@ window.addEventListener('load', function() {
       mdLines.push('');
       var docUrl = 'https://docs.qq.com/smartsheet/DSm5oVGdybWdkWkdH';
       mdLines.push('共 ' + memes.length + ' 条 | [查看完整报告](' + docUrl + ')');
+      const mdContent = mdLines.join('\n');
 
-      await apiPost('/webhook/wecom', { msgtype: 'markdown', content: mdLines.join('\n'), broadcast: true });
+      // 逐群推送
+      let successCount = 0;
+      for (const chatid of selectedChats) {
+        try {
+          // 第一条：markdown
+          await apiPost('/webhook/wecom', { msgtype: 'markdown', content: mdContent, chatid: chatid });
+          await new Promise(r => setTimeout(r, 800));
+          // 第二条：截图
+          var shotRes = await fetch('/screenshot-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startDate, endDate, chatid: chatid })
+          });
+          var shotData = await shotRes.json();
+          if (!shotData.ok) console.warn('截图推送失败(' + chatid + '):', shotData.error);
+          successCount++;
+          // 群间间隔
+          if (selectedChats.indexOf(chatid) < selectedChats.length - 1) {
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        } catch (chatErr) {
+          console.warn('推送到群 ' + chatid + ' 失败:', chatErr);
+        }
+      }
 
-      // ===== 稍等后发第二条：截图图片 =====
-      await new Promise(function(resolve) { setTimeout(resolve, 800); });
-
-      var shotRes = await fetch('/screenshot-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDate, endDate })
-      });
-      var shotData = await shotRes.json();
-      if (!shotData.ok) throw new Error(shotData.error || '截图推送失败');
-
-      // ===== 第三步：同步到腾讯文档智能表格 =====
+      // 同步到腾讯文档（只同步一次）
       try {
         await fetch('/sync-smartsheet', {
           method: 'POST',
@@ -2139,13 +2334,13 @@ window.addEventListener('load', function() {
         });
       } catch (syncErr) { console.warn('智能表格同步失败（不影响推送）:', syncErr); }
 
-      showToast('📣 已推送到企微群！', 'success');
+      showToast('📣 已推送到 ' + successCount + '/' + selectedChats.length + ' 个群！', 'success');
     } catch (err) {
       showToast('❌ 推送失败: ' + (err.message || '网络错误'), 'error');
     } finally {
-      this.disabled = false;
-      this.style.opacity = '1';
-      this.textContent = '📣 推送到企微群';
+      pushBtn.disabled = false;
+      pushBtn.style.opacity = '1';
+      pushBtn.textContent = '📣 推送到企微群';
     }
   });
 
