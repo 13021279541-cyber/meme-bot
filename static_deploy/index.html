@@ -650,10 +650,18 @@
 
       <!-- 群选择弹窗 -->
       <div id="chat-picker-modal" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px)" onclick="if(event.target===this)this.style.display='none'">
-        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:16px;padding:24px;min-width:320px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
-          <div style="font-size:16px;font-weight:700;margin-bottom:16px">📣 选择推送目标群</div>
-          <div id="chat-picker-list" style="margin-bottom:16px"></div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:16px;padding:24px;min-width:360px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+          <div style="font-size:16px;font-weight:700;margin-bottom:8px">📣 选择推送目标群</div>
+          <div style="font-size:12px;color:#94a3b8;margin-bottom:14px;line-height:1.6;background:#f8fafc;border-radius:8px;padding:10px 12px">
+            💡 推送建议：先自测群 ✅ → 再测试群 ✅ → 最后策划群+运营大群
+          </div>
+          <div id="chat-picker-list" style="margin-bottom:12px;border:1px solid #f0f0f0;border-radius:10px;overflow:hidden"></div>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button type="button" onclick="chatPickerSelectAll()" style="flex:1;padding:6px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;color:#555;font-size:12px">全选</button>
+            <button type="button" onclick="chatPickerDeselectAll()" style="flex:1;padding:6px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;color:#555;font-size:12px">全不选</button>
+          </div>
           <div id="chat-picker-error" style="display:none;color:#ef4444;font-size:13px;margin-bottom:10px"></div>
+          <div id="chat-picker-pushed" style="display:none;font-size:12px;color:#22c55e;margin-bottom:10px"></div>
           <div style="display:flex;gap:10px;justify-content:flex-end">
             <button type="button" onclick="document.getElementById('chat-picker-modal').style.display='none'" style="padding:8px 18px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;color:#555;font-size:14px">取消</button>
             <button type="button" id="btn-confirm-push" style="padding:8px 18px;border:none;border-radius:8px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:white;cursor:pointer;font-size:14px;font-weight:600">确认推送</button>
@@ -2100,6 +2108,10 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     const endDate = document.getElementById('report-end').value;
     if (!startDate || !endDate) { showToast('请选择日期范围', 'error'); return; }
 
+    // 新周报 = 新一轮推送，清空已推记录
+    window._pushedChatIds = new Set();
+    window._smartsheetSynced = false;
+
     // 获取勾选的梗
     const selectedIds = window._selectedMemeIds;
     if (selectedIds.size === 0) { showToast('请至少选择一条热梗', 'error'); return; }
@@ -2209,38 +2221,79 @@ window.addEventListener('load', function() {
   });
 
   // ===== 群名映射（按 chatid 首次出现顺序排序后匹配） =====
-  // 群名在前端维护，可随时扩展
-  const CHAT_NAMES = {
-    // 顺序：第一个录入的群 = 自测群，第二个 = 内部热点测试群
-    // 通过 order index 动态匹配（因为 chatid 可能变化）
-  };
-  let _chatNamesByOrder = ['自测群', '内部热点测试群']; // 按录入顺序匹配
+  // 群名在前端维护，按录入顺序匹配
+  // 顺序：①自测群 ②内部热点测试群 ③策划群 ④运营大群（可扩展）
+  const CHAT_GROUP_CONFIG = [
+    { name: '自测群', emoji: '🧪', tag: '测试', tagColor: '#94a3b8' },
+    { name: '内部热点测试群', emoji: '🔬', tag: '测试', tagColor: '#94a3b8' },
+    { name: '策划群', emoji: '📋', tag: '正式', tagColor: '#f59e0b' },
+    { name: '运营大群', emoji: '📢', tag: '正式', tagColor: '#ef4444' },
+    { name: '备用群', emoji: '💬', tag: '', tagColor: '#94a3b8' }
+  ];
+  let _chatNamesByOrder = CHAT_GROUP_CONFIG.map(c => c.name);
   window._selectedChatIds = new Set();
+  window._pushedChatIds = new Set(); // 本轮已推送成功的群
+
+  // 全选/全不选
+  window.chatPickerSelectAll = function() {
+    document.querySelectorAll('#chat-picker-list input[type=checkbox]:not(:disabled)').forEach(cb => {
+      cb.checked = true;
+      window._selectedChatIds.add(cb.dataset.chatid);
+    });
+  };
+  window.chatPickerDeselectAll = function() {
+    document.querySelectorAll('#chat-picker-list input[type=checkbox]').forEach(cb => {
+      cb.checked = false;
+    });
+    window._selectedChatIds.clear();
+  };
 
   // 加载群列表
   async function loadChatList() {
     const listEl = document.getElementById('chat-picker-list');
     const errEl = document.getElementById('chat-picker-error');
+    const pushedEl = document.getElementById('chat-picker-pushed');
     errEl.style.display = 'none';
     listEl.innerHTML = '<div style="text-align:center;padding:16px;color:#999">⏳ 加载中...</div>';
+    // 显示已推送提示
+    if (window._pushedChatIds.size > 0) {
+      const pushedNames = [...window._pushedChatIds].map(cid => {
+        const allChats = window._lastChatList || [];
+        const idx = allChats.findIndex(c => c.chatid === cid);
+        return (CHAT_GROUP_CONFIG[idx] || {}).name || cid.substring(0, 8);
+      });
+      pushedEl.textContent = '✅ 本轮已推送: ' + pushedNames.join(', ');
+      pushedEl.style.display = 'block';
+    } else {
+      pushedEl.style.display = 'none';
+    }
     try {
       const res = await apiGet('/webhook/aibot/chats');
       const chats = (res && res.chats) || [];
+      window._lastChatList = chats;
       if (chats.length === 0) {
         listEl.innerHTML = '<div style="padding:16px;color:#999;text-align:center">暂无可用群（请先在群里 @机器人 激活）</div>';
         return;
       }
-      // 不自动全选！保留用户之前的选择（如果有）
-      // 如果 _selectedChatIds 是空的（第一次打开），则不预选任何群
       let html = '';
       chats.forEach((chat, idx) => {
-        const chatName = _chatNamesByOrder[idx] || ('群 ' + (idx + 1));
+        const cfg = CHAT_GROUP_CONFIG[idx] || { name: '群 ' + (idx + 1), emoji: '💬', tag: '', tagColor: '#94a3b8' };
         const isAuth = chat.authenticated;
+        const isPushed = window._pushedChatIds.has(chat.chatid);
         const checked = isAuth && window._selectedChatIds.has(chat.chatid);
-        html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0;cursor:' + (isAuth ? 'pointer' : 'default') + (isAuth ? '' : ';opacity:0.4') + '">';
+        html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0;cursor:' + (isAuth ? 'pointer' : 'default') + (isAuth ? '' : ';opacity:0.4') + (isPushed ? ';background:#f0fdf4' : '') + '">';
         html += '<input type="checkbox"' + (checked ? ' checked' : '') + (isAuth ? '' : ' disabled') + ' data-chatid="' + chat.chatid + '" style="width:18px;height:18px;accent-color:#6366f1" onchange="onChatCheckChange(this)">';
         html += '<div style="flex:1">';
-        html += '<div style="font-size:14px;font-weight:600;color:#333">' + escapeHtml(chatName) + '</div>';
+        html += '<div style="display:flex;align-items:center;gap:6px">';
+        html += '<span style="font-size:16px">' + cfg.emoji + '</span>';
+        html += '<span style="font-size:14px;font-weight:600;color:#333">' + escapeHtml(cfg.name) + '</span>';
+        if (cfg.tag) {
+          html += '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:' + cfg.tagColor + '20;color:' + cfg.tagColor + ';font-weight:600">' + cfg.tag + '</span>';
+        }
+        if (isPushed) {
+          html += '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:#dcfce7;color:#16a34a;font-weight:600">已推送 ✅</span>';
+        }
+        html += '</div>';
         html += '<div style="font-size:11px;color:#aaa;margin-top:2px">机器人: ' + escapeHtml(chat.name || chat.botId.substring(0, 10) + '...') + (isAuth ? ' ✅' : ' ❌ 未连接') + '</div>';
         html += '</div></label>';
       });
@@ -2262,7 +2315,7 @@ window.addEventListener('load', function() {
   document.getElementById('btn-push-wecom').addEventListener('click', async function() {
     const memes = window._lastReportMemes;
     if (!memes || memes.length === 0) { showToast('请先预览周报', 'error'); return; }
-    // 弹出群选择弹窗
+    // 弹出群选择弹窗（不重置已推记录，方便分步推送）
     document.getElementById('chat-picker-modal').style.display = 'block';
     await loadChatList();
   });
@@ -2276,8 +2329,10 @@ window.addEventListener('load', function() {
 
     if (selectedChats.length === 0) { showToast('请至少选择一个群', 'error'); return; }
 
-    // 关闭弹窗
-    document.getElementById('chat-picker-modal').style.display = 'none';
+    // 不关闭弹窗！用户可以继续推下一批
+    const confirmBtn = document.getElementById('btn-confirm-push');
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = '⏳ 推送中...';
 
     const pushBtn = document.getElementById('btn-push-wecom');
     pushBtn.disabled = true;
@@ -2323,7 +2378,7 @@ window.addEventListener('load', function() {
       console.log('[推送诊断] selectedChats:', selectedChats, 'memes数量:', memes.length, 'html长度:', mobileHtml.length, 'html包含m-root:', mobileHtml.includes('m-root'), 'html包含m-cover:', mobileHtml.includes('m-cover'));
 
       // ===== 截图一次（传 HTML 给服务端，不再让服务端重新渲染） =====
-      pushBtn.textContent = '⏳ 截图生成中...';
+      confirmBtn.textContent = '⏳ 截图生成中...';
       var shotRes = await fetch('/screenshot-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2336,7 +2391,8 @@ window.addEventListener('load', function() {
       let successCount = 0;
       for (let ci = 0; ci < selectedChats.length; ci++) {
         const chatid = selectedChats[ci];
-        pushBtn.textContent = '⏳ 推送中（' + (ci + 1) + '/' + selectedChats.length + '）...';
+        confirmBtn.textContent = '⏳ 推送（' + (ci + 1) + '/' + selectedChats.length + '）...';
+        pushBtn.textContent = '⏳ 推送（' + (ci + 1) + '/' + selectedChats.length + '）...';
         try {
           // 第一条：markdown
           await apiPost('/webhook/wecom', { msgtype: 'markdown', content: mdContent, chatid: chatid });
@@ -2346,6 +2402,7 @@ window.addEventListener('load', function() {
             await apiPost('/upload-and-send-image', { chatid: chatid, base64: shotData.images[0].base64, filename: shotData.images[0].filename || 'report.jpg' });
           }
           successCount++;
+          window._pushedChatIds.add(chatid); // 记录已推送
           // 群间间隔
           if (ci < selectedChats.length - 1) {
             await new Promise(r => setTimeout(r, 2000));
@@ -2355,19 +2412,29 @@ window.addEventListener('load', function() {
         }
       }
 
-      // 同步到腾讯文档（只同步一次）
-      try {
-        await fetch('/sync-smartsheet', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ memes: memes, pushPeriod: startDate + '~' + endDate })
-        });
-      } catch (syncErr) { console.warn('智能表格同步失败（不影响推送）:', syncErr); }
+      // 同步到腾讯文档（只同步一次，且仅在首次推送时同步）
+      if (!window._smartsheetSynced) {
+        try {
+          await fetch('/sync-smartsheet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ memes: memes, pushPeriod: startDate + '~' + endDate })
+          });
+          window._smartsheetSynced = true;
+        } catch (syncErr) { console.warn('智能表格同步失败（不影响推送）:', syncErr); }
+      }
 
       showToast('📣 已推送到 ' + successCount + '/' + selectedChats.length + ' 个群！', 'success');
+
+      // 推送完成后：清空已选、刷新列表（显示已推标记），弹窗保持打开
+      window._selectedChatIds.clear();
+      await loadChatList();
+
     } catch (err) {
       showToast('❌ 推送失败: ' + (err.message || '网络错误'), 'error');
     } finally {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = '确认推送';
       pushBtn.disabled = false;
       pushBtn.style.opacity = '1';
       pushBtn.textContent = '📣 推送到企微群';

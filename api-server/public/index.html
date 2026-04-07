@@ -625,13 +625,49 @@
         <div style="font-size:12px;color:#aaa;margin-top:6px">默认上周一到今天，可手动调整</div>
       </div>
 
+      <button type="button" class="submit-btn" id="btn-fetch-memes" style="margin-bottom:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6)">🔍 筛选热梗</button>
+
+      <!-- 梗列表选择区 -->
+      <div id="meme-picker" style="display:none;margin-bottom:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:13px;color:#888" id="meme-picker-summary"></div>
+          <div style="display:flex;gap:8px">
+            <button type="button" onclick="toggleAllMemes(true)" style="font-size:12px;padding:4px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;color:#555">全选</button>
+            <button type="button" onclick="toggleAllMemes(false)" style="font-size:12px;padding:4px 10px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;color:#555">全不选</button>
+          </div>
+        </div>
+        <div id="meme-picker-list" style="max-height:400px;overflow-y:auto;border:1px solid #eee;border-radius:12px;background:#fafbfc"></div>
+        <div style="font-size:12px;color:#aaa;margin-top:6px">取消勾选 = 本次不推送（不影响梗的等级）</div>
+      </div>
+
       <div id="report-summary" style="background:#f8f9fc;border-radius:12px;padding:16px 18px;margin-bottom:18px;display:none">
         <div style="font-size:13px;color:#888" id="report-summary-text"></div>
       </div>
 
-      <button type="button" class="submit-btn" id="btn-preview-report" style="margin-bottom:10px">👀 预览周报</button>
+      <button type="button" class="submit-btn" id="btn-preview-report" style="margin-bottom:10px;display:none">👀 预览周报</button>
       <button type="button" class="submit-btn" id="btn-download-report" style="background:linear-gradient(135deg,#43e97b,#38f9d7);box-shadow:0 4px 16px rgba(67,233,123,0.3);display:none">📥 下载 HTML 周报</button>
       <button type="button" class="submit-btn" id="btn-push-wecom" style="background:linear-gradient(135deg,#3b82f6,#8b5cf6);box-shadow:0 4px 16px rgba(59,130,246,0.3);display:none;margin-top:10px">📣 推送到企微群</button>
+
+      <!-- 群选择弹窗 -->
+      <div id="chat-picker-modal" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px)" onclick="if(event.target===this)this.style.display='none'">
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:16px;padding:24px;min-width:360px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+          <div style="font-size:16px;font-weight:700;margin-bottom:8px">📣 选择推送目标群</div>
+          <div style="font-size:12px;color:#94a3b8;margin-bottom:14px;line-height:1.6;background:#f8fafc;border-radius:8px;padding:10px 12px">
+            💡 推送建议：先自测群 ✅ → 再测试群 ✅ → 最后策划群+运营大群
+          </div>
+          <div id="chat-picker-list" style="margin-bottom:12px;border:1px solid #f0f0f0;border-radius:10px;overflow:hidden"></div>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <button type="button" onclick="chatPickerSelectAll()" style="flex:1;padding:6px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;color:#555;font-size:12px">全选</button>
+            <button type="button" onclick="chatPickerDeselectAll()" style="flex:1;padding:6px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;color:#555;font-size:12px">全不选</button>
+          </div>
+          <div id="chat-picker-error" style="display:none;color:#ef4444;font-size:13px;margin-bottom:10px"></div>
+          <div id="chat-picker-pushed" style="display:none;font-size:12px;color:#22c55e;margin-bottom:10px"></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button type="button" onclick="document.getElementById('chat-picker-modal').style.display='none'" style="padding:8px 18px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;color:#555;font-size:14px">取消</button>
+            <button type="button" id="btn-confirm-push" style="padding:8px 18px;border:none;border-radius:8px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:white;cursor:pointer;font-size:14px;font-weight:600">确认推送</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="report-preview-frame" style="margin-top:20px;display:none">
@@ -1065,11 +1101,11 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
           html += '<div class="priority-dots" data-id="' + m.id + '">';
           ['red','orange','blue','gray'].forEach(c => {
             html += '<span class="priority-dot dot-' + c + (pri === c ? ' active' : '') + '" data-priority="' + c + '" title="' +
-              ({red:'🔴 必上',orange:'🟠 推荐',blue:'🔵 可选',gray:'⚪ 不上报'}[c]) + '"></span>';
+              ({red:'🔴 重点',orange:'🟠 上升',blue:'🔵 观察',gray:'⚪ 待定'}[c]) + '"></span>';
           });
           html += '</div>';
         } else if (pri) {
-          const priLabel = {red:'🔴 必上',orange:'🟠 推荐',blue:'🔵 可选'}[pri] || '';
+          const priLabel = {red:'🔴 重点',orange:'🟠 上升',blue:'🔵 观察'}[pri] || '';
           if (priLabel) html += '<span class="tag-btn" style="cursor:default;font-size:11px">' + priLabel + '</span>';
         }
         html += '</div>';
@@ -1661,38 +1697,438 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     return html;
   }
 
+  // ===== 手机版周报（推送群聊用，竖版750px宽，单列大卡片） =====
+  function generateMobileReportHTML(memes, startDate, endDate) {
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const dateRange = s.getFullYear() + '年 ' + (s.getMonth()+1) + '月' + s.getDate() + '日 ~ ' + (e.getMonth()+1) + '月' + e.getDate() + '日';
+    const PLACEHOLDER_EMOJIS = ['🔥','💀','😂','🤡','👀','💅','🐶','🌶️','⚡','🎭','🤯','😎'];
+
+    // 等级颜色映射
+    const priorityColors = { red: '#ef4444', orange: '#f59e0b', blue: '#3b82f6' };
+    const priorityLabels = { red: '🔴 重点', orange: '🟠 上升', blue: '🔵 观察' };
+
+    // ========== 自适应排版引擎 ==========
+    // 目标：总图片高度尽量控制在 ~4500px 以内（2x JPEG q85 约 2MB）
+    const n = memes.length;
+    let layout, imgH, showWordCloud, showSummary, showFollow, coverPadding, titleSize, cardNameSize, cardSummarySize, cols, cardGap, listPad;
+
+    if (n <= 4) {
+      // 宽松模式：两列大卡片，完整封面
+      layout = 'grid'; cols = 2; imgH = 280;
+      showWordCloud = true; showSummary = true; showFollow = true;
+      coverPadding = '48px 40px 40px'; titleSize = 52;
+      cardNameSize = 24; cardSummarySize = 18;
+      cardGap = 16; listPad = '24px 20px';
+    } else if (n <= 8) {
+      // 标准模式：两列卡片，图片缩小，封面去词云
+      layout = 'grid'; cols = 2; imgH = 180;
+      showWordCloud = false; showSummary = true; showFollow = true;
+      coverPadding = '36px 40px 28px'; titleSize = 44;
+      cardNameSize = 22; cardSummarySize = 16;
+      cardGap = 12; listPad = '16px 16px';
+    } else if (n <= 14) {
+      // 紧凑模式：两列小卡片，图片更小，无词云无描述
+      layout = 'grid'; cols = 2; imgH = 120;
+      showWordCloud = false; showSummary = false; showFollow = false;
+      coverPadding = '28px 40px 20px'; titleSize = 40;
+      cardNameSize = 20; cardSummarySize = 14;
+      cardGap = 10; listPad = '12px 12px';
+    } else {
+      // 列表模式：一行一梗，缩略图
+      layout = 'list'; cols = 1; imgH = 60;
+      showWordCloud = false; showSummary = false; showFollow = false;
+      coverPadding = '24px 40px 16px'; titleSize = 36;
+      cardNameSize = 20; cardSummarySize = 14;
+      cardGap = 8; listPad = '12px 16px';
+    }
+
+    // 词云（仅在 showWordCloud 时生成）
+    let wordCloudHTML = '';
+    if (showWordCloud) {
+      const wordCloudItems = memes.map((m, i) => {
+        const ratio = i / memes.length;
+        let size = ratio < 0.2 ? 1 : ratio < 0.4 ? 2 : ratio < 0.6 ? 3 : ratio < 0.8 ? 4 : 5;
+        return { name: m.name, size: size };
+      });
+      for (let i = wordCloudItems.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [wordCloudItems[i], wordCloudItems[j]] = [wordCloudItems[j], wordCloudItems[i]];
+      }
+      wordCloudHTML = `<div class="word-cloud">` +
+        wordCloudItems.map(w => `<span class="word s${w.size}">${escapeHtml(w.name)}</span>`).join('') +
+        `</div>`;
+    }
+
+    // 卡片宽度
+    const cardWidth = layout === 'list'
+      ? '100%'
+      : (cols === 2 ? `calc(50% - ${cardGap/2}px)` : `calc(33.33% - ${cardGap*2/3}px)`);
+
+    let html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=750">
+<title>🔥 热梗周报</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 750px !important; max-width: 750px !important; overflow-x: hidden !important; margin: 0; padding: 0; }
+  body { font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif; background: #f5f5f7; color: #1d1d1f; }
+  .m-root { width: 750px; max-width: 750px; overflow: hidden; margin: 0 auto; }
+
+  /* ===== 封面 ===== */
+  .m-cover {
+    width: 750px; position: relative; overflow: hidden;
+    background: linear-gradient(160deg, #6366f1 0%, #8b5cf6 35%, #a855f7 65%, #d946ef 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; color: white; padding: ${coverPadding};
+  }
+  .m-cover h1 { font-size: ${titleSize}px; font-weight: 900; letter-spacing: 4px; text-shadow: 0 2px 16px rgba(0,0,0,0.15); }
+  .m-cover .date { font-size: ${Math.round(titleSize*0.5)}px; margin-top: ${showWordCloud ? 14 : 10}px; opacity: 0.8; font-weight: 500; }
+  .m-cover .count { font-size: ${Math.round(titleSize*0.42)}px; margin-top: 6px; opacity: 0.6; }
+  .m-cover .word-cloud { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 16px; max-width: 650px; margin-top: 36px; }
+  .m-cover .word { font-weight: 700; line-height: 1.3; }
+  .m-cover .word.s1 { font-size: 38px; }
+  .m-cover .word.s2 { font-size: 32px; }
+  .m-cover .word.s3 { font-size: 26px; }
+  .m-cover .word.s4 { font-size: 22px; }
+  .m-cover .word.s5 { font-size: 18px; }
+  .m-cover .word:nth-child(6n+1) { color: rgba(255,255,255,0.9); }
+  .m-cover .word:nth-child(6n+2) { color: rgba(253,224,71,0.85); }
+  .m-cover .word:nth-child(6n+3) { color: rgba(147,197,253,0.85); }
+  .m-cover .word:nth-child(6n+4) { color: rgba(249,168,212,0.85); }
+  .m-cover .word:nth-child(6n+5) { color: rgba(167,243,208,0.85); }
+  .m-cover .word:nth-child(6n+6) { color: rgba(253,186,116,0.85); }
+  .m-cover .team { margin-top: ${showWordCloud ? 28 : 16}px; font-size: ${showWordCloud ? 20 : 18}px; opacity: 0.5; letter-spacing: 3px; }
+
+  /* ===== 分隔符 ===== */
+  .m-divider {
+    width: 750px; padding: ${showWordCloud ? '32px 40px' : '20px 40px'}; background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+  }
+  .m-divider .line { flex: 1; height: 1px; background: rgba(255,255,255,0.3); }
+  .m-divider .text { font-size: ${showWordCloud ? 20 : 18}px; color: rgba(255,255,255,0.85); font-weight: 600; letter-spacing: 2px; white-space: nowrap; }
+
+  /* ===== 卡片列表区 ===== */
+  .m-list { width: 750px; padding: ${listPad}; background: #f5f5f7; display: flex; flex-wrap: wrap; gap: ${cardGap}px; }
+
+  /* --- 网格卡片模式 --- */
+  .m-card {
+    width: ${cardWidth}; background: white; border-radius: ${layout === 'list' ? 10 : 14}px; overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.04);
+    position: relative; display: flex; flex-direction: ${layout === 'list' ? 'row' : 'column'};
+  }
+  .m-card .top-bar { height: ${layout === 'list' ? 0 : 4}px; ${layout === 'list' ? 'display:none;' : ''} }
+  .m-card:nth-child(4n+1) .top-bar { background: linear-gradient(90deg, #6366f1, #8b5cf6); }
+  .m-card:nth-child(4n+2) .top-bar { background: linear-gradient(90deg, #ec4899, #f43f5e); }
+  .m-card:nth-child(4n+3) .top-bar { background: linear-gradient(90deg, #06b6d4, #3b82f6); }
+  .m-card:nth-child(4n+4) .top-bar { background: linear-gradient(90deg, #10b981, #34d399); }
+
+  .m-card .card-idx {
+    position: absolute; top: ${layout === 'list' ? 4 : 8}px; right: ${layout === 'list' ? 8 : 10}px; font-size: ${layout === 'list' ? 24 : 36}px; font-weight: 900;
+    color: rgba(99,102,241,0.06); line-height: 1; z-index: 1;
+  }
+
+  .m-card .img-wrap {
+    ${layout === 'list' ? `width: ${imgH}px; min-width: ${imgH}px; height: ${imgH}px;` : `width: 100%; height: ${imgH}px;`}
+    overflow: hidden; background: #f8f9fc; position: relative; ${layout === 'list' ? 'border-radius: 10px 0 0 10px;' : ''}
+  }
+  .m-card .img-wrap img {
+    width: 100%; height: 100%; display: block; object-fit: cover;
+  }
+  .m-card .no-img {
+    ${layout === 'list' ? `width: ${imgH}px; height: ${imgH}px;` : `width: 100%; height: ${imgH}px;`}
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+    display: flex; align-items: center; justify-content: center; font-size: ${layout === 'list' ? 28 : 48}px;
+  }
+
+  .m-card .badge-row {
+    position: absolute; top: ${layout === 'list' ? 4 : 8}px; left: ${layout === 'list' ? 4 : 8}px; display: flex; gap: 4px; z-index: 2; flex-wrap: wrap;
+  }
+  .m-card .cat-badge {
+    padding: 2px ${layout === 'list' ? 4 : 8}px; border-radius: 12px; font-size: ${layout === 'list' ? 11 : 16}px; font-weight: 700;
+    backdrop-filter: blur(8px); box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  }
+  .m-card .cat-wz { background: rgba(99,102,241,0.9); color: white; }
+  .m-card .cat-pub { background: rgba(249,115,22,0.9); color: white; }
+  .m-card .pri-badge {
+    padding: 2px ${layout === 'list' ? 4 : 8}px; border-radius: 12px; font-size: ${layout === 'list' ? 11 : 16}px; font-weight: 700;
+    backdrop-filter: blur(8px); box-shadow: 0 1px 4px rgba(0,0,0,0.12); color: white;
+  }
+
+  .m-card .body { padding: ${layout === 'list' ? '8px 10px' : '14px 14px 12px'}; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+  .m-card .name {
+    font-size: ${cardNameSize}px; font-weight: 800; line-height: 1.3; color: #1d1d1f;
+    margin-bottom: ${layout === 'list' ? 4 : 8}px; display: -webkit-box; -webkit-line-clamp: ${layout === 'list' ? 1 : 2};
+    -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .m-card .name a { color: #1d1d1f; text-decoration: none; }
+  .m-card .summary {
+    font-size: ${cardSummarySize}px; color: #6b7280; line-height: 1.5; margin-bottom: ${layout === 'list' ? 4 : 10}px;
+    display: -webkit-box; -webkit-line-clamp: ${layout === 'list' ? 1 : 2}; -webkit-box-orient: vertical; overflow: hidden;
+    flex: 1;
+  }
+
+  .m-card .follow-row {
+    padding-top: 8px; border-top: 1px dashed #e5e7eb; font-size: 16px;
+  }
+  .m-card .follow-item { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .m-card .follow-tag {
+    padding: 2px 8px; border-radius: 6px; font-weight: 700; white-space: nowrap; font-size: 14px;
+  }
+  .m-card .follow-tag.official { background: #dbeafe; color: #1d4ed8; }
+  .m-card .follow-tag.incentive { background: #fef3c7; color: #d97706; }
+  .m-card .follow-link { color: #6366f1; text-decoration: none; font-size: 16px; }
+
+  .m-card .foot {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-top: ${layout === 'list' ? 4 : 8}px; border-top: 1px solid #f3f4f6; margin-top: auto;
+  }
+  .m-card .source {
+    font-size: ${layout === 'list' ? 14 : 16}px; color: #6366f1; text-decoration: none;
+    padding: 3px ${layout === 'list' ? 6 : 10}px; background: rgba(99,102,241,0.08); border-radius: 12px;
+  }
+  .m-card .date { font-size: ${layout === 'list' ? 12 : 14}px; color: #9ca3af; }
+
+  /* ===== 尾部 ===== */
+  .m-footer {
+    width: 750px; padding: ${n <= 4 ? '40px 28px' : '24px 28px'}; text-align: center;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white;
+  }
+  .m-footer .logo { font-size: ${n <= 4 ? 36 : 24}px; margin-bottom: 6px; }
+  .m-footer .text { font-size: ${n <= 4 ? 20 : 16}px; opacity: 0.7; }
+
+  /* 排版模式标注（调试用，正式截图不显示） */
+  .m-layout-hint { display: none; }
+</style>
+</head>
+<body>
+<div class="m-root">
+
+<!-- 封面 -->
+<div class="m-cover">
+  <h1>热梗洞察周报</h1>
+  <div class="date">${escapeHtml(dateRange)}</div>
+  <div class="count">本期共收录 ${memes.length} 条热梗</div>
+  ${wordCloudHTML}
+  <div class="team">by 用户社区组</div>
+</div>
+
+<!-- 分隔符 -->
+<div class="m-divider">
+  <div class="line"></div>
+  <div class="text">🔥 本周热梗精选</div>
+  <div class="line"></div>
+</div>
+
+<!-- 卡片列表 -->
+<div class="m-list">`;
+
+    memes.forEach((meme, idx) => {
+      const created = new Date(meme.created_at);
+      const dateDisplay = (created.getMonth()+1) + '/' + created.getDate();
+      const emoji = PLACEHOLDER_EMOJIS[Math.floor(Math.random() * PLACEHOLDER_EMOJIS.length)];
+      const imgSrc = meme.image_path && meme.image_path.startsWith('http') ? meme.image_path : '';
+      const priColor = priorityColors[meme.priority] || '#9ca3af';
+      const priLabel = priorityLabels[meme.priority] || '';
+
+      html += `<div class="m-card">
+    <div class="top-bar"></div>
+    <span class="card-idx">#${idx + 1}</span>`;
+
+      // 图片区 + badges
+      const badgeHTML = `<div class="badge-row">${
+        meme.category === 'wangzhe'
+          ? `<span class="cat-badge cat-wz">🎮 王者相关</span>`
+          : `<span class="cat-badge cat-pub">🌐 大众热点</span>`
+      }${priLabel ? `<span class="pri-badge" style="background:${priColor}">${priLabel}</span>` : ''}</div>`;
+
+      if (imgSrc) {
+        html += `<div class="img-wrap">${badgeHTML}<img src="${imgSrc}" loading="lazy" /></div>`;
+      } else {
+        html += `<div class="img-wrap">${badgeHTML}<div class="no-img">${emoji}</div></div>`;
+      }
+
+      html += `<div class="body">
+      <div class="name">${meme.source_url ? `<a href="${escapeHtml(meme.source_url)}" target="_blank">${escapeHtml(meme.name)}</a>` : escapeHtml(meme.name)}</div>`;
+
+      if (showSummary && meme.summary) {
+        html += `<div class="summary">${escapeHtml(meme.summary)}</div>`;
+      }
+
+      // 跟进信息（仅在 showFollow 时显示）
+      if (showFollow && (meme.official_title || meme.official_link || meme.incentive_topic || meme.incentive_link)) {
+        html += `<div class="follow-row">`;
+        if (meme.official_title || meme.official_link) {
+          html += `<div class="follow-item"><span class="follow-tag official">📢 官号跟进</span>`;
+          if (meme.official_title) html += `<span style="color:#374151">${escapeHtml(meme.official_title)}</span>`;
+          if (meme.official_link) html += `<a class="follow-link" href="${escapeHtml(meme.official_link)}" target="_blank">查看→</a>`;
+          html += `</div>`;
+        }
+        if (meme.incentive_topic || meme.incentive_link) {
+          html += `<div class="follow-item"><span class="follow-tag incentive">🎯 作者激励</span>`;
+          if (meme.incentive_topic) html += `<span style="color:#374151">${escapeHtml(meme.incentive_topic)}</span>`;
+          if (meme.incentive_link) html += `<a class="follow-link" href="${escapeHtml(meme.incentive_link)}" target="_blank">优质作品→</a>`;
+          html += `</div>`;
+        }
+        html += `</div>`;
+      }
+
+      html += `<div class="foot">`;
+      if (meme.source_url) {
+        html += `<a class="source" href="${escapeHtml(meme.source_url)}" target="_blank">🔗 原视频</a>`;
+      } else {
+        html += `<span></span>`;
+      }
+      html += `<span class="date">${dateDisplay}</span>
+      </div>
+    </div>
+  </div>`;
+    });
+
+    html += `</div>
+
+<!-- 尾部 -->
+<div class="m-footer">
+  <div class="logo">🔥</div>
+  <div class="text">热梗洞察 · 用户社区组</div>
+</div>
+
+</div><!-- .m-root -->
+</body></html>`;
+    return html;
+  }
+
   // 预览
-  document.getElementById('btn-preview-report').addEventListener('click', async function() {
+  // ===== 等级名称映射（全局复用） =====
+  const PRIORITY_LABELS = {red:'🔴 重点',orange:'🟠 上升',blue:'🔵 观察',gray:'⚪ 待定'};
+  const PRIORITY_ORDER = { red: 0, orange: 1, blue: 2, '': 3 };
+
+  // 梗列表选择相关状态
+  window._fetchedMemes = []; // 筛选出的全部梗（含灰色）
+  window._selectedMemeIds = new Set(); // 勾选的梗 ID
+
+  window.toggleAllMemes = function(checked) {
+    window._selectedMemeIds.clear();
+    if (checked) {
+      window._fetchedMemes.forEach(m => { if (m.priority !== 'gray') window._selectedMemeIds.add(String(m.id)); });
+    }
+    document.querySelectorAll('#meme-picker-list input[type="checkbox"]').forEach(cb => {
+      cb.checked = checked && cb.closest('.meme-pick-item').dataset.priority !== 'gray';
+    });
+    updatePickerSummary();
+  };
+
+  function updatePickerSummary() {
+    const total = window._fetchedMemes.length;
+    const selected = window._selectedMemeIds.size;
+    document.getElementById('meme-picker-summary').innerHTML =
+      '共 <b>' + total + '</b> 条梗，已选 <b style="color:#6366f1">' + selected + '</b> 条';
+    // 预览按钮显示/隐藏
+    document.getElementById('btn-preview-report').style.display = selected > 0 ? 'block' : 'none';
+    // 隐藏之前的预览和推送按钮（重新筛选后需要重新预览）
+    document.getElementById('btn-download-report').style.display = 'none';
+    document.getElementById('btn-push-wecom').style.display = 'none';
+    document.getElementById('report-preview-frame').style.display = 'none';
+    document.getElementById('report-summary').style.display = 'none';
+  }
+
+  function renderMemePicker(memes) {
+    const list = document.getElementById('meme-picker-list');
+    const priOrder = PRIORITY_ORDER;
+    // 排序：按等级
+    memes.sort((a, b) => (priOrder[a.priority || ''] || 3) - (priOrder[b.priority || ''] || 3));
+    window._fetchedMemes = memes;
+    window._selectedMemeIds.clear();
+    // 默认勾选非灰色
+    memes.forEach(m => { if (m.priority !== 'gray') window._selectedMemeIds.add(String(m.id)); });
+
+    let html = '';
+    memes.forEach(m => {
+      const pri = m.priority || '';
+      const priLabel = PRIORITY_LABELS[pri] || '';
+      const isGray = pri === 'gray';
+      const checked = !isGray;
+      const catLabel = m.category === 'wangzhe' ? '🎮' : '🌐';
+      const imgThumb = m.image_path && m.image_path.startsWith('http')
+        ? '<img src="' + m.image_path + '" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0">'
+        : '<div style="width:36px;height:36px;border-radius:6px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🔥</div>';
+      html += '<label class="meme-pick-item" data-priority="' + pri + '" data-id="' + m.id + '" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background 0.15s' + (isGray ? ';opacity:0.5' : '') + '">';
+      html += '<input type="checkbox"' + (checked ? ' checked' : '') + ' style="width:18px;height:18px;accent-color:#6366f1;flex-shrink:0" onchange="onMemeCheckChange(this,\'' + m.id + '\')">';
+      html += imgThumb;
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-size:14px;font-weight:600;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + catLabel + ' ' + escapeHtml(m.name) + '</div>';
+      html += '<div style="font-size:12px;color:#999;margin-top:2px">' + priLabel + (m.summary ? ' · ' + escapeHtml(m.summary).substring(0, 30) : '') + '</div>';
+      html += '</div>';
+      html += '</label>';
+    });
+    list.innerHTML = html;
+    updatePickerSummary();
+  }
+
+  window.onMemeCheckChange = function(cb, id) {
+    if (cb.checked) {
+      window._selectedMemeIds.add(String(id));
+    } else {
+      window._selectedMemeIds.delete(String(id));
+    }
+    updatePickerSummary();
+  };
+
+  // ===== 第一步：筛选热梗 =====
+  document.getElementById('btn-fetch-memes').addEventListener('click', async function() {
     const startDate = document.getElementById('report-start').value;
     const endDate = document.getElementById('report-end').value;
     if (!startDate || !endDate) { showToast('请选择日期范围', 'error'); return; }
 
     this.disabled = true;
+    this.textContent = '⏳ 加载中...';
+    try {
+      const memes = await apiGet('/memes?start_date=' + startDate + '&end_date=' + endDate);
+      if (!memes || memes.length === 0) {
+        showToast('该时间范围内没有热梗', 'error');
+        document.getElementById('meme-picker').style.display = 'none';
+        return;
+      }
+      document.getElementById('meme-picker').style.display = 'block';
+      renderMemePicker(memes);
+      showToast('✅ 已加载 ' + memes.length + ' 条热梗', 'success');
+    } catch (err) {
+      showToast('❌ ' + (err.message || '加载失败'), 'error');
+    } finally {
+      this.disabled = false;
+      this.textContent = '🔍 筛选热梗';
+    }
+  });
+
+  // ===== 第二步：预览周报（用勾选的梗） =====
+  document.getElementById('btn-preview-report').addEventListener('click', async function() {
+    const startDate = document.getElementById('report-start').value;
+    const endDate = document.getElementById('report-end').value;
+    if (!startDate || !endDate) { showToast('请选择日期范围', 'error'); return; }
+
+    // 新周报 = 新一轮推送，清空已推记录
+    window._pushedChatIds = new Set();
+    window._smartsheetSynced = false;
+
+    // 获取勾选的梗
+    const selectedIds = window._selectedMemeIds;
+    if (selectedIds.size === 0) { showToast('请至少选择一条热梗', 'error'); return; }
+
+    const filtered = window._fetchedMemes.filter(m => selectedIds.has(String(m.id)));
+    filtered.sort((a, b) => (PRIORITY_ORDER[a.priority || ''] || 3) - (PRIORITY_ORDER[b.priority || ''] || 3));
+
+    this.disabled = true;
     this.textContent = '⏳ 生成中...';
 
     try {
-      // 从 API 查询
-      const startDt = startDate;
-      const endDt = endDate;
-      const memes = await apiGet('/memes?start_date=' + startDt + '&end_date=' + endDt);
-
-      // 过滤灰色
-      const filtered = (memes || []).filter(m => m.priority !== 'gray');
-      if (filtered.length === 0) {
-        showToast('该时间范围内没有可上报的热梗', 'error');
-        return;
-      }
-
-      // 按等级排序
-      const priorityOrder = { red: 0, orange: 1, blue: 2, '': 3 };
-      filtered.sort((a, b) => (priorityOrder[a.priority || ''] || 3) - (priorityOrder[b.priority || ''] || 3));
-
       // 生成 HTML
       lastReportHtml = generateReportHTML(filtered, startDate, endDate);
 
       // 显示摘要
       document.getElementById('report-summary-text').innerHTML =
-        '📊 范围 <b>' + startDate + '</b> ~ <b>' + endDate + '</b>　|　共 <b>' + filtered.length + '</b> 条热梗（已过滤灰色）';
+        '📊 范围 <b>' + startDate + '</b> ~ <b>' + endDate + '</b>　|　共 <b>' + filtered.length + '</b> 条热梗';
       document.getElementById('report-summary').style.display = 'block';
 
       // 预览
@@ -1784,23 +2220,141 @@ window.addEventListener('load', function() {
     showToast('📥 下载已开始', 'success');
   });
 
-  // ===== 推送到企微智能机器人（服务端自动截图推送）=====
+  // ===== 群名映射（按 chatid 首次出现顺序排序后匹配） =====
+  // 群名在前端维护，按录入顺序匹配
+  // 顺序：①自测群 ②内部热点测试群 ③策划群 ④运营大群（可扩展）
+  const CHAT_GROUP_CONFIG = [
+    { name: '自测群', emoji: '🧪', tag: '测试', tagColor: '#94a3b8' },
+    { name: '内部热点测试群', emoji: '🔬', tag: '测试', tagColor: '#94a3b8' },
+    { name: '策划群', emoji: '📋', tag: '正式', tagColor: '#f59e0b' },
+    { name: '运营大群', emoji: '📢', tag: '正式', tagColor: '#ef4444' },
+    { name: '备用群', emoji: '💬', tag: '', tagColor: '#94a3b8' }
+  ];
+  let _chatNamesByOrder = CHAT_GROUP_CONFIG.map(c => c.name);
+  window._selectedChatIds = new Set();
+  window._pushedChatIds = new Set(); // 本轮已推送成功的群
 
+  // 全选/全不选
+  window.chatPickerSelectAll = function() {
+    document.querySelectorAll('#chat-picker-list input[type=checkbox]:not(:disabled)').forEach(cb => {
+      cb.checked = true;
+      window._selectedChatIds.add(cb.dataset.chatid);
+    });
+  };
+  window.chatPickerDeselectAll = function() {
+    document.querySelectorAll('#chat-picker-list input[type=checkbox]').forEach(cb => {
+      cb.checked = false;
+    });
+    window._selectedChatIds.clear();
+  };
+
+  // 加载群列表
+  async function loadChatList() {
+    const listEl = document.getElementById('chat-picker-list');
+    const errEl = document.getElementById('chat-picker-error');
+    const pushedEl = document.getElementById('chat-picker-pushed');
+    errEl.style.display = 'none';
+    listEl.innerHTML = '<div style="text-align:center;padding:16px;color:#999">⏳ 加载中...</div>';
+    // 显示已推送提示
+    if (window._pushedChatIds.size > 0) {
+      const pushedNames = [...window._pushedChatIds].map(cid => {
+        const allChats = window._lastChatList || [];
+        const idx = allChats.findIndex(c => c.chatid === cid);
+        return (CHAT_GROUP_CONFIG[idx] || {}).name || cid.substring(0, 8);
+      });
+      pushedEl.textContent = '✅ 本轮已推送: ' + pushedNames.join(', ');
+      pushedEl.style.display = 'block';
+    } else {
+      pushedEl.style.display = 'none';
+    }
+    try {
+      const res = await apiGet('/webhook/aibot/chats');
+      const chats = (res && res.chats) || [];
+      window._lastChatList = chats;
+      if (chats.length === 0) {
+        listEl.innerHTML = '<div style="padding:16px;color:#999;text-align:center">暂无可用群（请先在群里 @机器人 激活）</div>';
+        return;
+      }
+      let html = '';
+      chats.forEach((chat, idx) => {
+        const cfg = CHAT_GROUP_CONFIG[idx] || { name: '群 ' + (idx + 1), emoji: '💬', tag: '', tagColor: '#94a3b8' };
+        const isAuth = chat.authenticated;
+        const isPushed = window._pushedChatIds.has(chat.chatid);
+        const checked = isAuth && window._selectedChatIds.has(chat.chatid);
+        html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0;cursor:' + (isAuth ? 'pointer' : 'default') + (isAuth ? '' : ';opacity:0.4') + (isPushed ? ';background:#f0fdf4' : '') + '">';
+        html += '<input type="checkbox"' + (checked ? ' checked' : '') + (isAuth ? '' : ' disabled') + ' data-chatid="' + chat.chatid + '" style="width:18px;height:18px;accent-color:#6366f1" onchange="onChatCheckChange(this)">';
+        html += '<div style="flex:1">';
+        html += '<div style="display:flex;align-items:center;gap:6px">';
+        html += '<span style="font-size:16px">' + cfg.emoji + '</span>';
+        html += '<span style="font-size:14px;font-weight:600;color:#333">' + escapeHtml(cfg.name) + '</span>';
+        if (cfg.tag) {
+          html += '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:' + cfg.tagColor + '20;color:' + cfg.tagColor + ';font-weight:600">' + cfg.tag + '</span>';
+        }
+        if (isPushed) {
+          html += '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:#dcfce7;color:#16a34a;font-weight:600">已推送 ✅</span>';
+        }
+        html += '</div>';
+        html += '<div style="font-size:11px;color:#aaa;margin-top:2px">机器人: ' + escapeHtml(chat.name || chat.botId.substring(0, 10) + '...') + (isAuth ? ' ✅' : ' ❌ 未连接') + '</div>';
+        html += '</div></label>';
+      });
+      listEl.innerHTML = html;
+    } catch (err) {
+      listEl.innerHTML = '';
+      errEl.textContent = '加载群列表失败: ' + (err.message || '网络错误');
+      errEl.style.display = 'block';
+    }
+  }
+
+  window.onChatCheckChange = function(cb) {
+    const chatid = cb.dataset.chatid;
+    if (cb.checked) window._selectedChatIds.add(chatid);
+    else window._selectedChatIds.delete(chatid);
+  };
+
+  // ===== 推送到企微：先弹群选择弹窗 =====
   document.getElementById('btn-push-wecom').addEventListener('click', async function() {
     const memes = window._lastReportMemes;
     if (!memes || memes.length === 0) { showToast('请先预览周报', 'error'); return; }
+    // 弹出群选择弹窗（不重置已推记录，方便分步推送）
+    document.getElementById('chat-picker-modal').style.display = 'block';
+    await loadChatList();
+  });
 
+  // ===== 确认推送 =====
+  document.getElementById('btn-confirm-push').addEventListener('click', async function() {
+    const memes = window._lastReportMemes;
     const startDate = window._lastReportStart;
     const endDate = window._lastReportEnd;
+    const selectedChats = [...window._selectedChatIds];
 
-    if (!confirm('确认推送 ' + memes.length + ' 条热梗到企微群？')) return;
+    if (selectedChats.length === 0) { showToast('请至少选择一个群', 'error'); return; }
 
-    this.disabled = true;
-    this.style.opacity = '0.7';
-    this.textContent = '⏳ 推送中...';
+    // 不关闭弹窗！用户可以继续推下一批
+    const confirmBtn = document.getElementById('btn-confirm-push');
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = '⏳ 推送中...';
+
+    const pushBtn = document.getElementById('btn-push-wecom');
+    pushBtn.disabled = true;
+    pushBtn.style.opacity = '0.7';
+    pushBtn.textContent = '⏳ 推送中（' + selectedChats.length + ' 个群）...';
 
     try {
-      // ===== 第一条：markdown 文字版（精简清单） =====
+      // ===== 校验后端版本（防止 CVM 代码未更新导致截图/推送错误）=====
+      const REQUIRED_API_VERSION = '2026-03-30-v3';
+      try {
+        const verRes = await fetch('/version');
+        const verData = await verRes.json();
+        if (verData.version !== REQUIRED_API_VERSION) {
+          showToast('⚠️ 服务端代码版本不匹配（当前: ' + (verData.version || '未知') + '，需要: ' + REQUIRED_API_VERSION + '），请联系运维部署最新代码', 'error');
+          return;
+        }
+      } catch (verErr) {
+        showToast('⚠️ 无法校验服务端版本（可能代码太旧），请确认已部署最新代码后重试', 'error');
+        return;
+      }
+
+      // ===== 构建 markdown =====
       var mdLines = ['**🔥 热梗洞察周报** | ' + startDate + ' ~ ' + endDate, ''];
       memes.forEach(function(m, i) {
         var line = (i + 1) + '. **' + m.name + '**';
@@ -1817,36 +2371,73 @@ window.addEventListener('load', function() {
       mdLines.push('');
       var docUrl = 'https://docs.qq.com/smartsheet/DSm5oVGdybWdkWkdH';
       mdLines.push('共 ' + memes.length + ' 条 | [查看完整报告](' + docUrl + ')');
+      const mdContent = mdLines.join('\n');
 
-      await apiPost('/webhook/wecom', { msgtype: 'markdown', content: mdLines.join('\n'), broadcast: true });
+      // ===== 生成 mobile 版周报 HTML（用勾选的梗）=====
+      const mobileHtml = generateMobileReportHTML(memes, startDate, endDate);
+      console.log('[推送诊断] selectedChats:', selectedChats, 'memes数量:', memes.length, 'html长度:', mobileHtml.length, 'html包含m-root:', mobileHtml.includes('m-root'), 'html包含m-cover:', mobileHtml.includes('m-cover'));
 
-      // ===== 稍等后发第二条：截图图片 =====
-      await new Promise(function(resolve) { setTimeout(resolve, 800); });
-
+      // ===== 截图一次（传 HTML 给服务端，不再让服务端重新渲染） =====
+      confirmBtn.textContent = '⏳ 截图生成中...';
       var shotRes = await fetch('/screenshot-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDate, endDate })
+        body: JSON.stringify({ startDate, endDate, html: mobileHtml })
       });
       var shotData = await shotRes.json();
-      if (!shotData.ok) throw new Error(shotData.error || '截图推送失败');
+      if (!shotData.ok) throw new Error(shotData.error || '截图生成失败');
 
-      // ===== 第三步：同步到腾讯文档智能表格 =====
-      try {
-        await fetch('/sync-smartsheet', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ memes: memes, pushPeriod: startDate + '~' + endDate })
-        });
-      } catch (syncErr) { console.warn('智能表格同步失败（不影响推送）:', syncErr); }
+      // ===== 逐群推送（markdown + 截图） =====
+      let successCount = 0;
+      for (let ci = 0; ci < selectedChats.length; ci++) {
+        const chatid = selectedChats[ci];
+        confirmBtn.textContent = '⏳ 推送（' + (ci + 1) + '/' + selectedChats.length + '）...';
+        pushBtn.textContent = '⏳ 推送（' + (ci + 1) + '/' + selectedChats.length + '）...';
+        try {
+          // 第一条：markdown
+          await apiPost('/webhook/wecom', { msgtype: 'markdown', content: mdContent, chatid: chatid });
+          await new Promise(r => setTimeout(r, 1500));
+          // 第二条：截图图片（直接用已截图的 base64 上传发送）
+          if (shotData.images && shotData.images.length > 0 && shotData.images[0].base64) {
+            await apiPost('/upload-and-send-image', { chatid: chatid, base64: shotData.images[0].base64, filename: shotData.images[0].filename || 'report.jpg' });
+          }
+          successCount++;
+          window._pushedChatIds.add(chatid); // 记录已推送
+          // 群间间隔
+          if (ci < selectedChats.length - 1) {
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        } catch (chatErr) {
+          console.warn('推送到群 ' + chatid + ' 失败:', chatErr);
+        }
+      }
 
-      showToast('📣 已推送到企微群！', 'success');
+      // 同步到腾讯文档（只同步一次，且仅在首次推送时同步）
+      if (!window._smartsheetSynced) {
+        try {
+          await fetch('/sync-smartsheet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ memes: memes, pushPeriod: startDate + '~' + endDate })
+          });
+          window._smartsheetSynced = true;
+        } catch (syncErr) { console.warn('智能表格同步失败（不影响推送）:', syncErr); }
+      }
+
+      showToast('📣 已推送到 ' + successCount + '/' + selectedChats.length + ' 个群！', 'success');
+
+      // 推送完成后：清空已选、刷新列表（显示已推标记），弹窗保持打开
+      window._selectedChatIds.clear();
+      await loadChatList();
+
     } catch (err) {
       showToast('❌ 推送失败: ' + (err.message || '网络错误'), 'error');
     } finally {
-      this.disabled = false;
-      this.style.opacity = '1';
-      this.textContent = '📣 推送到企微群';
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = '确认推送';
+      pushBtn.disabled = false;
+      pushBtn.style.opacity = '1';
+      pushBtn.textContent = '📣 推送到企微群';
     }
   });
 
@@ -1895,10 +2486,15 @@ window.addEventListener('load', function() {
       // 创建周报展示容器
       const reportView = document.createElement('div');
       reportView.id = 'report-fullview';
+      reportView.style.cssText = 'max-width:750px;margin:0 auto;overflow:hidden;';
       reportView.innerHTML = '<div style="text-align:center;padding:40px 20px"><div class="spinner"></div><p style="margin-top:12px;color:#999">加载周报中...</p></div>';
       document.querySelector('.container').appendChild(reportView);
+      document.body.style.overflowX = 'hidden';
 
-      // 加载数据并渲染（使用与预览相同的 generateReportHTML 生成 16:9 四列布局）
+      // 检测是否手机版
+      const isMobileReport = urlParams.get('mobile') === '1';
+
+      // 加载数据并渲染
       (async function() {
         try {
           const memes = await apiGet('/memes?start_date=' + rStart + '&end_date=' + rEnd);
@@ -1912,10 +2508,20 @@ window.addEventListener('load', function() {
           const priorityOrder = { red: 0, orange: 1, blue: 2, '': 3 };
           filtered.sort((a, b) => (priorityOrder[a.priority || ''] || 3) - (priorityOrder[b.priority || ''] || 3));
 
-          // 直接用 generateReportHTML 生成完整 16:9 周报
-          const fullHtml = generateReportHTML(filtered, rStart, rEnd);
+          // 手机版或PC版
+          const fullHtml = isMobileReport
+            ? generateMobileReportHTML(filtered, rStart, rEnd)
+            : generateReportHTML(filtered, rStart, rEnd);
 
-          // 提取 <body> 内容和 <style> 内容，注入当前页面
+          if (isMobileReport) {
+            // 手机版：直接替换整个页面，避免主页面 CSS 干扰
+            document.open();
+            document.write(fullHtml);
+            document.close();
+            return;
+          }
+
+          // PC版：提取 <body> 内容和 <style> 内容，注入当前页面
           const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
           const styleMatch = fullHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
 
