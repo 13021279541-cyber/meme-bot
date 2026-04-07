@@ -564,7 +564,7 @@ app.get('/webhook/aibot/health', async (req, res) => {
 
 // ===== 同步到腾讯文档智能表格 =====
 const https = require('https');
-const TDOC_TOKEN = process.env.TDOC_TOKEN || 'f1e30d2488ad48bb97ebde568900cb8f';
+const TDOC_TOKEN = process.env.TDOC_TOKEN || '';
 const SMARTSHEET_FILE_ID = 'JnhTgrmgdZGG';
 const SMARTSHEET_SHEET_ID = 't00i2h';
 
