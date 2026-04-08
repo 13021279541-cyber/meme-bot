@@ -2344,10 +2344,10 @@ window.addEventListener('load', function() {
         if (m.source_url) line += '  [视频](' + m.source_url + ')';
         if (m.summary) line += '\n   > ' + m.summary;
         if (m.official_title || m.official_link) {
-          line += '\n   > 官号跟进：' + (m.official_title || '') + (m.official_link ? '  [查看](' + m.official_link + ')' : '');
+          line += '\n   > 📌【官号跟进】' + (m.official_title || '') + (m.official_link ? '  [查看](' + m.official_link + ')' : '');
         }
         if (m.incentive_topic || m.incentive_link) {
-          line += '\n   > 作者激励：' + (m.incentive_topic || '') + (m.incentive_link ? '  [查看](' + m.incentive_link + ')' : '');
+          line += '\n   > 🎁【作者激励】' + (m.incentive_topic || '') + (m.incentive_link ? '  [查看](' + m.incentive_link + ')' : '');
         }
         mdLines.push(line);
       });
