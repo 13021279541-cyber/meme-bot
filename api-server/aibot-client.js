@@ -38,7 +38,7 @@ const path = require('path');
         if (eqIdx < 1) continue;
         const key = trimmed.substring(0, eqIdx).trim();
         const val = trimmed.substring(eqIdx + 1).trim();
-        if (!process.env[key]) process.env[key] = val; // 不覆盖已有环境变量
+        process.env[key] = val; // .env 为准，覆盖 PM2 ecosystem 注入的值
       }
       console.log(`[env] 已加载 ${envPath}`);
       return;
