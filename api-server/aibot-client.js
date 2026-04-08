@@ -138,8 +138,8 @@ function connectBot(botId) {
   if (!bot) return;
   const cfg = bot.config;
 
-  if (!cfg.bot_id || !cfg.secret) {
-    log('ERROR', `机器人 ${cfg.name || botId} 未配置 bot_id 或 secret`);
+  if (!cfg.bot_id) {
+    log('ERROR', `机器人 ${cfg.name || botId} 未配置 bot_id`);
     return;
   }
 
