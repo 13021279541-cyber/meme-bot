@@ -1844,17 +1844,16 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   }
 
   .m-card .badge-row {
-    position: absolute; top: ${layout === 'list' ? 4 : 8}px; left: ${layout === 'list' ? 4 : 8}px; display: flex; gap: 4px; z-index: 2; flex-wrap: wrap;
+    display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
   }
   .m-card .cat-badge {
-    padding: 2px ${layout === 'list' ? 4 : 8}px; border-radius: 12px; font-size: ${layout === 'list' ? 11 : 16}px; font-weight: 700;
-    backdrop-filter: blur(8px); box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    padding: 2px ${layout === 'list' ? 4 : 8}px; border-radius: 12px; font-size: ${layout === 'list' ? 11 : 13}px; font-weight: 700;
   }
-  .m-card .cat-wz { background: rgba(99,102,241,0.9); color: white; }
-  .m-card .cat-pub { background: rgba(249,115,22,0.9); color: white; }
+  .m-card .cat-wz { background: rgba(99,102,241,0.12); color: #6366f1; }
+  .m-card .cat-pub { background: rgba(249,115,22,0.12); color: #ea580c; }
   .m-card .pri-badge {
-    padding: 2px ${layout === 'list' ? 4 : 8}px; border-radius: 12px; font-size: ${layout === 'list' ? 11 : 16}px; font-weight: 700;
-    backdrop-filter: blur(8px); box-shadow: 0 1px 4px rgba(0,0,0,0.12); color: white;
+    padding: 2px ${layout === 'list' ? 4 : 8}px; border-radius: 12px; font-size: ${layout === 'list' ? 11 : 13}px; font-weight: 700;
+    color: white;
   }
 
   .m-card .body { padding: ${layout === 'list' ? '8px 10px' : '14px 14px 12px'}; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
@@ -1891,13 +1890,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   }
   .m-card .date { font-size: ${layout === 'list' ? 12 : 14}px; color: #9ca3af; }
 
-  /* ===== 尾部 ===== */
-  .m-footer {
-    width: 750px; padding: ${n <= 4 ? '40px 28px' : '24px 28px'}; text-align: center;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white;
-  }
-  .m-footer .logo { font-size: ${n <= 4 ? 36 : 24}px; margin-bottom: 6px; }
-  .m-footer .text { font-size: ${n <= 4 ? 20 : 16}px; opacity: 0.7; }
+
 
   /* 排版模式标注（调试用，正式截图不显示） */
   .m-layout-hint { display: none; }
@@ -1937,7 +1930,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     <div class="top-bar"></div>
     <span class="card-idx">#${idx + 1}</span>`;
 
-      // 图片区 + badges
+      // badge HTML（放到 foot 区域显示）
       const badgeHTML = `<div class="badge-row">${
         meme.category === 'wangzhe'
           ? `<span class="cat-badge cat-wz">🎮 王者相关</span>`
@@ -1945,9 +1938,9 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       }${priLabel ? `<span class="pri-badge" style="background:${priColor}">${priLabel}</span>` : ''}</div>`;
 
       if (imgSrc) {
-        html += `<div class="img-wrap">${badgeHTML}<img src="${imgSrc}" loading="lazy" /></div>`;
+        html += `<div class="img-wrap"><img src="${imgSrc}" loading="lazy" /></div>`;
       } else {
-        html += `<div class="img-wrap">${badgeHTML}<div class="no-img">${emoji}</div></div>`;
+        html += `<div class="img-wrap"><div class="no-img">${emoji}</div></div>`;
       }
 
       html += `<div class="body">
@@ -1976,11 +1969,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       }
 
       html += `<div class="foot">`;
-      if (meme.source_url) {
-        html += `<a class="source" href="${escapeHtml(meme.source_url)}" target="_blank">🔗 原视频</a>`;
-      } else {
-        html += `<span></span>`;
-      }
+      html += badgeHTML;
       html += `<span class="date">${dateDisplay}</span>
       </div>
     </div>
@@ -1988,12 +1977,6 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     });
 
     html += `</div>
-
-<!-- 尾部 -->
-<div class="m-footer">
-  <div class="logo">🔥</div>
-  <div class="text">热梗洞察 · 用户社区组</div>
-</div>
 
 </div><!-- .m-root -->
 </body></html>`;
