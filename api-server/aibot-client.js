@@ -22,6 +22,16 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
+// ========== 加载 .env（兼容从任意目录启动） ==========
+try {
+  // 优先加载同目录 .env，备选 /root/api-server/.env（PM2 从 /root/ 启动时）
+  const envPath = fs.existsSync(path.join(__dirname, '.env'))
+    ? path.join(__dirname, '.env')
+    : '/root/api-server/.env';
+  require('dotenv').config({ path: envPath });
+} catch (e) { /* dotenv 非必须 */ }
+
+
 // ========== CHAT_ID 持久化 ==========
 const CHAT_IDS_FILE = path.join(__dirname, 'chat_ids.json');
 
