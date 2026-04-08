@@ -1866,7 +1866,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   .m-card .name a { color: #1d1d1f; text-decoration: none; }
   .m-card .summary {
     font-size: ${cardSummarySize}px; color: #6b7280; line-height: 1.5; margin-bottom: ${layout === 'list' ? 4 : 10}px;
-    display: -webkit-box; -webkit-line-clamp: ${layout === 'list' ? 1 : 2}; -webkit-box-orient: vertical; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: ${n <= 4 ? 5 : n <= 8 ? 3 : layout === 'list' ? 1 : 2}; -webkit-box-orient: vertical; overflow: hidden;
     flex: 1;
   }
 
@@ -2369,8 +2369,7 @@ window.addEventListener('load', function() {
         mdLines.push(line);
       });
       mdLines.push('');
-      var docUrl = 'https://docs.qq.com/smartsheet/DSm5oVGdybWdkWkdH';
-      mdLines.push('共 ' + memes.length + ' 条 | [查看完整报告](' + docUrl + ')');
+      mdLines.push('共 ' + memes.length + ' 条');
       const mdContent = mdLines.join('\n');
 
       // ===== 生成 mobile 版周报 HTML（用勾选的梗）=====
@@ -2412,17 +2411,17 @@ window.addEventListener('load', function() {
         }
       }
 
-      // 同步到腾讯文档（只同步一次，且仅在首次推送时同步）
-      if (!window._smartsheetSynced) {
-        try {
-          await fetch('/sync-smartsheet', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ memes: memes, pushPeriod: startDate + '~' + endDate })
-          });
-          window._smartsheetSynced = true;
-        } catch (syncErr) { console.warn('智能表格同步失败（不影响推送）:', syncErr); }
-      }
+      // [暂停] 同步到腾讯文档——表格内容待修正，明天再恢复
+      // if (!window._smartsheetSynced) {
+      //   try {
+      //     await fetch('/sync-smartsheet', {
+      //       method: 'POST',
+      //       headers: { 'Content-Type': 'application/json' },
+      //       body: JSON.stringify({ memes: memes, pushPeriod: startDate + '~' + endDate })
+      //   });
+      //     window._smartsheetSynced = true;
+      //   } catch (syncErr) { console.warn('智能表格同步失败（不影响推送）:', syncErr); }
+      // }
 
       showToast('📣 已推送到 ' + successCount + '/' + selectedChats.length + ' 个群！', 'success');
 
