@@ -590,6 +590,11 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label>一句话概括 <span style="color:#aaa;font-weight:normal;font-size:12px">（选填，后续也可在列表中补录）</span></label>
+          <input type="text" name="summary" id="input-summary" placeholder="用一句话描述这个梗的核心玩法/笑点" maxlength="100">
+        </div>
+
         <button type="submit" class="submit-btn" id="submit-btn">🚀 提交热梗</button>
       </form>
     </div>
@@ -984,12 +989,14 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       const imageUrl = await uploadImageToSupabase(imageFile);
 
       // 2. 通过 API 插入记录
+      const summary = document.getElementById('input-summary').value.trim();
       const meme = {
         name: name,
         source_url: sourceUrl,
         category: catInput.value,
         image_path: imageUrl,
       };
+      if (summary) meme.summary = summary;
 
       await apiPost('/memes', meme);
 
@@ -1865,7 +1872,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   .m-card .name a { color: #1d1d1f; text-decoration: none; }
   .m-card .summary {
     font-size: ${cardSummarySize}px; color: #6b7280; line-height: 1.5; margin-bottom: ${layout === 'list' ? 4 : 10}px;
-    display: -webkit-box; -webkit-line-clamp: ${n <= 4 ? 5 : n <= 8 ? 3 : layout === 'list' ? 1 : 2}; -webkit-box-orient: vertical; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: ${layout === 'list' ? 2 : 999}; -webkit-box-orient: vertical; overflow: hidden;
     flex: 1;
   }
 
