@@ -592,7 +592,7 @@
 
         <div class="form-group">
           <label>一句话概括 <span style="color:#aaa;font-weight:normal;font-size:12px">（选填，后续也可在列表中补录）</span></label>
-          <input type="text" name="summary" id="input-summary" placeholder="100字以内，描述核心玩法/笑点" maxlength="100">
+          <input type="text" name="summary" id="input-summary" placeholder="150字以内，描述核心玩法/笑点" maxlength="150">
         </div>
 
         <button type="submit" class="submit-btn" id="submit-btn">🚀 提交热梗</button>
@@ -1269,7 +1269,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     const editDiv = document.createElement('div');
     editDiv.className = 'inline-edit';
     editDiv.innerHTML =
-      '<input type="text" placeholder="输入一句话概括" maxlength="200" value="' + escapeHtml(currentText) + '">' +
+      '<input type="text" placeholder="输入一句话概括" maxlength="150" value="' + escapeHtml(currentText) + '">' +
       '<button class="save-btn" type="button">保存</button>' +
       '<button class="cancel-btn" type="button">取消</button>';
 
