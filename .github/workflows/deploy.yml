@@ -1,0 +1,31 @@
+name: Deploy to CVM
+
+# 触发条件：push 到 main 分支时自动部署
+# 也支持在 GitHub 网页手动触发（workflow_dispatch）
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      # 这些文件改动不触发部署（纯文档/演示物，不影响线上服务）
+      - '**.md'
+      - 'demo_*.png'
+      - 'report_*.png'
+      - '*.json'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    # 关键：跑在 CVM 上的 self-hosted runner（标签 meme-cvm）
+    # 因为 CVM 是内网无公网 IP，GitHub 连不进来，
+    # 所以由 CVM 内部的 runner 主动出站连 GitHub 拉取任务。
+    runs-on: [self-hosted, meme-cvm]
+
+    steps:
+      - name: 执行一键部署脚本
+        run: |
+          echo "🚀 收到 push，开始在 CVM 上部署..."
+          cd /root/meme-bot
+          # runner 已在 CVM 本地，直接调用现成的幂等部署脚本
+          bash /root/meme-bot/deploy.sh
+          echo "✅ 部署流程结束"
