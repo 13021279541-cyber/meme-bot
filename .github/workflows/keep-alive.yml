@@ -12,42 +12,69 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Ping Supabase to prevent hibernation
+      - name: Ping all Supabase projects to prevent hibernation
+        env:
+          # 项目1：meme-web 热梗中心
+          MEME_URL: ${{ secrets.SUPABASE_URL }}
+          MEME_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # 项目2：素材库原型（2026-08-17 新增，此前漏保活导致项目被暂停）
+          MATERIAL_URL: ${{ secrets.MATERIAL_SUPABASE_URL }}
+          MATERIAL_KEY: ${{ secrets.MATERIAL_SUPABASE_ANON_KEY }}
         run: |
-          echo "🏓 Pinging Supabase to keep it alive..."
-          
-          SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
-          SUPABASE_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
-          
-          # 方法1: 通过 REST API 查询 memes 表（产生数据库活动）
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-            "${SUPABASE_URL}/rest/v1/memes?select=id&limit=1" \
-            -H "apikey: ${SUPABASE_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_KEY}")
-          
-          echo "Database query response: HTTP ${HTTP_CODE}"
-          
-          # 方法2: 调用 Storage API（双重保险）
-          HTTP_CODE2=$(curl -s -o /dev/null -w "%{http_code}" \
-            "${SUPABASE_URL}/storage/v1/bucket" \
-            -H "apikey: ${SUPABASE_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_KEY}")
-          
-          echo "Storage API response: HTTP ${HTTP_CODE2}"
-          
-          # 方法3: 调用 Auth API
-          HTTP_CODE3=$(curl -s -o /dev/null -w "%{http_code}" \
-            "${SUPABASE_URL}/auth/v1/settings" \
-            -H "apikey: ${SUPABASE_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_KEY}")
-          
-          echo "Auth API response: HTTP ${HTTP_CODE3}"
-          
-          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
-            echo "✅ Supabase is alive and responding!"
-          else
-            echo "⚠️ Supabase may be paused or unreachable (HTTP ${HTTP_CODE})"
+          FAILED=0
+
+          ping_project () {
+            local NAME="$1" URL="$2" KEY="$3" TABLE="$4"
+
+            echo "----------------------------------------"
+            echo "🏓 [$NAME] 保活探测中..."
+
+            if [ -z "$URL" ] || [ -z "$KEY" ]; then
+              echo "⚠️  [$NAME] 未配置 Secrets，跳过"
+              echo "    请在仓库 Settings → Secrets 中补齐后重试"
+              FAILED=1
+              return
+            fi
+
+            # 主探测：查询业务表，产生真实数据库活动（这是重置休眠倒计时的关键）
+            HTTP_DB=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+              "${URL}/rest/v1/${TABLE}?select=id&limit=1" \
+              -H "apikey: ${KEY}" -H "Authorization: Bearer ${KEY}")
+            echo "    数据库查询($TABLE): HTTP ${HTTP_DB}"
+
+            # 辅助探测：Storage 与 Auth，双重保险
+            HTTP_ST=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+              "${URL}/storage/v1/bucket" \
+              -H "apikey: ${KEY}" -H "Authorization: Bearer ${KEY}")
+            echo "    Storage API: HTTP ${HTTP_ST}"
+
+            HTTP_AU=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+              "${URL}/auth/v1/settings" \
+              -H "apikey: ${KEY}" -H "Authorization: Bearer ${KEY}")
+            echo "    Auth API: HTTP ${HTTP_AU}"
+
+            if [ "$HTTP_DB" -ge 200 ] && [ "$HTTP_DB" -lt 400 ]; then
+              echo "✅ [$NAME] 存活正常"
+            elif [ "$HTTP_DB" = "000" ]; then
+              echo "❌ [$NAME] 无法连接（域名解析失败或项目已被删除）"
+              echo "    → 请登录 https://supabase.com/dashboard 检查项目状态"
+              FAILED=1
+            else
+              echo "❌ [$NAME] 异常（HTTP ${HTTP_DB}），项目可能已暂停"
+              echo "    → 请登录 https://supabase.com/dashboard 点击 Restore 恢复"
+              FAILED=1
+            fi
+          }
+
+          ping_project "meme-web 热梗中心" "$MEME_URL"     "$MEME_KEY"     "memes"
+          ping_project "素材库原型"        "$MATERIAL_URL" "$MATERIAL_KEY" "materials"
+
+          echo "----------------------------------------"
+          echo "🕐 完成于 $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+          if [ "$FAILED" -ne 0 ]; then
+            echo "::error::存在异常项目，请查看上方日志并登录 Supabase Dashboard 处理"
             exit 1
           fi
-          
-          echo "🎉 Keep-alive ping completed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+          echo "🎉 全部项目保活成功"
