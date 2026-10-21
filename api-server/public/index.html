@@ -4,8 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🔥 热梗录入</title>
-<!-- Supabase JS SDK (仅图片上传用) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- 2026-10-21 起图片改存 CVM 本地，不再依赖 Supabase SDK（省去一次公网 CDN 加载） -->
 <style>
   /* ===== 基础 ===== */
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -590,6 +589,11 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label>一句话概括 <span style="color:#aaa;font-weight:normal;font-size:12px">（选填，后续也可在列表中补录）</span></label>
+          <input type="text" name="summary" id="input-summary" placeholder="150字以内，描述核心玩法/笑点" maxlength="150">
+        </div>
+
         <button type="submit" class="submit-btn" id="submit-btn">🚀 提交热梗</button>
       </form>
     </div>
@@ -729,11 +733,76 @@ const API_BASE = (location.hostname === 'localhost' || location.hostname === '12
   ? 'http://localhost:3000'
   : '';
 
-// Supabase（仅用于图片 Storage 上传，数据走 API）
-const SUPABASE_URL = 'https://iwmvtizwcibusjjiquwq.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3bXZ0aXp3Y2lidXNqamlxdXdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MjMxMDUsImV4cCI6MjA4OTk5OTEwNX0.E6dx_ewnrFXgnoMoWsu0Hk27RbByf3w8ztmb6C9XIOM';
-const STORAGE_BUCKET = 'meme-images';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ===== 图片存储：CVM 本地磁盘（2026-10-21 从 Supabase 迁移）=====
+// 旧数据的 image_path 是 Supabase 绝对 URL，新数据是 /uploads/xxx.jpg 相对路径，两者都要能显示
+
+// 把数据库里的 image_path 解析成可访问的完整地址
+function resolveImg(p) {
+  if (!p) return '';
+  if (p.indexOf('http') === 0) return p;            // 存量：Supabase 绝对 URL
+  if (p.charAt(0) === '/') return (API_BASE || location.origin) + p;  // 新增：本地相对路径
+  return '';
+}
+
+// 推导缩略图地址（仅本地图片有缩略图，取不到时由 onerror 回落到原图）
+function thumbImg(p) {
+  if (!p || p.indexOf('http') === 0) return resolveImg(p);
+  return resolveImg(p.replace(/(\.[a-z0-9]+)$/i, '_thumb$1'));
+}
+
+// 缩略图加载失败时回落原图（避免存量/历史图没有缩略图时裂图）
+function imgFallback(p) {
+  return ' onerror="this.onerror=null;this.src=\'' + resolveImg(p) + '\'"';
+}
+
+// 上传前压缩：限制最长边 + 转 JPEG，大幅降低体积和加载耗时
+function compressImage(file, maxSize, quality) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        var w = img.width, h = img.height;
+        if (w > maxSize || h > maxSize) {
+          if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+          else { w = Math.round(w * maxSize / h); h = maxSize; }
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, w, h);   // 填白底，避免透明 PNG 转 JPEG 后发黑
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function(blob) {
+          blob ? resolve(blob) : reject(new Error('图片压缩失败'));
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = function() { reject(new Error('图片读取失败')); };
+      img.src = e.target.result;
+    };
+    reader.onerror = function() { reject(new Error('文件读取失败')); };
+    reader.readAsDataURL(file);
+  });
+}
+
+// 上传图片到 CVM 本地存储，返回相对路径（同时生成并上传缩略图）
+async function uploadImage(file) {
+  const main = await compressImage(file, 1600, 0.85);
+  const thumb = await compressImage(file, 400, 0.8).catch(function() { return null; });
+
+  const fd = new FormData();
+  fd.append('image', main, 'meme.jpg');
+  if (thumb) fd.append('thumb', thumb, 'thumb.jpg');
+
+  const res = await fetch((API_BASE || '') + '/upload-image', { method: 'POST', body: fd });
+  if (!res.ok) {
+    const e = await res.json().catch(function() { return {}; });
+    throw new Error(e.error || ('上传失败 HTTP ' + res.status));
+  }
+  const data = await res.json();
+  if (!data.ok || !data.url) throw new Error(data.error || '上传失败');
+  return data.url;
+}
 
 // ===== API 辅助函数 =====
 async function apiGet(path) {
@@ -924,23 +993,6 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     });
   });
 
-  // ===== Supabase 图片上传 =====
-  async function uploadImageToSupabase(file) {
-    const ext = file.name.split('.').pop().toLowerCase();
-    const uniqueName = Math.random().toString(36).substr(2, 12) + '.' + ext;
-    const path = 'uploads/' + uniqueName;
-
-    const { data, error } = await sb.storage.from(STORAGE_BUCKET).upload(path, file, {
-      contentType: file.type,
-      upsert: false
-    });
-
-    if (error) throw new Error('图片上传失败: ' + error.message);
-
-    const { data: urlData } = sb.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-    return urlData.publicUrl;
-  }
-
   // ===== 企微 Webhook =====
   async function sendWebhook(memeName) {
     if (!WEBHOOK_URL) return;
@@ -980,16 +1032,18 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     submitBtn.textContent = '⏳ 提交中...';
 
     try {
-      // 1. 上传图片到 Supabase Storage
-      const imageUrl = await uploadImageToSupabase(imageFile);
+      // 1. 上传图片到 CVM 本地存储
+      const imageUrl = await uploadImage(imageFile);
 
       // 2. 通过 API 插入记录
+      const summary = document.getElementById('input-summary').value.trim();
       const meme = {
         name: name,
         source_url: sourceUrl,
         category: catInput.value,
         image_path: imageUrl,
       };
+      if (summary) meme.summary = summary;
 
       await apiPost('/memes', meme);
 
@@ -1046,8 +1100,9 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
         const cat = m.category || '';
         const pri = m.priority || '';
 
-        // 图片 URL
-        var imgSrc = m.image_path && m.image_path.startsWith('http') ? m.image_path : '';
+        // 图片 URL（列表用缩略图，加载失败回落原图）
+        var imgSrc = thumbImg(m.image_path);
+        var imgErr = imgFallback(m.image_path);
 
         html += '<li class="meme-item" data-id="' + m.id + '">';
         // 图片区：管理员可点击更换，普通用户只看
@@ -1057,7 +1112,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
           html += '<div class="thumb-wrapper">';
         }
         if (imgSrc) {
-          html += '<img class="meme-thumb" src="' + imgSrc + '" alt="">';
+          html += '<img class="meme-thumb" src="' + imgSrc + '" alt=""' + imgErr + '>';
         } else {
           html += '<div class="meme-thumb-placeholder">' + emoji + '</div>';
         }
@@ -1262,7 +1317,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     const editDiv = document.createElement('div');
     editDiv.className = 'inline-edit';
     editDiv.innerHTML =
-      '<input type="text" placeholder="输入一句话概括" maxlength="200" value="' + escapeHtml(currentText) + '">' +
+      '<input type="text" placeholder="输入一句话概括" maxlength="150" value="' + escapeHtml(currentText) + '">' +
       '<button class="save-btn" type="button">保存</button>' +
       '<button class="cancel-btn" type="button">取消</button>';
 
@@ -1323,14 +1378,8 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     }
 
     try {
-      // 上传到 Supabase Storage
-      const ext = file.name.split('.').pop() || 'png';
-      const filePath = 'meme_' + memeId + '_' + Date.now() + '.' + ext;
-      const { data: uploadData, error: uploadErr } = await sb.storage.from('meme-images').upload(filePath, file, { upsert: true });
-      if (uploadErr) throw uploadErr;
-
-      const { data: urlData } = sb.storage.from('meme-images').getPublicUrl(filePath);
-      const publicUrl = urlData.publicUrl;
+      // 上传到 CVM 本地存储
+      const publicUrl = await uploadImage(file);
 
       // 更新数据库（通过 API）
       await apiPatch('/memes/' + memeId, { image_path: publicUrl });
@@ -1413,14 +1462,15 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       let html = '<ul class="meme-list">';
       memes.forEach(m => {
         const emoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
-        var imgSrc = m.image_path && m.image_path.startsWith('http') ? m.image_path : '';
+        var imgSrc = thumbImg(m.image_path);
+        var imgErr = imgFallback(m.image_path);
         const deletedAt = new Date(m.deleted_at);
         const daysLeft = Math.max(0, 7 - Math.floor((now - deletedAt) / (1000 * 60 * 60 * 24)));
         const deletedDateStr = (deletedAt.getMonth()+1) + '/' + deletedAt.getDate() + ' ' + String(deletedAt.getHours()).padStart(2,'0') + ':' + String(deletedAt.getMinutes()).padStart(2,'0');
 
         html += '<li class="meme-item" data-id="' + m.id + '">';
         if (imgSrc) {
-          html += '<img class="meme-thumb" src="' + imgSrc + '" alt="" style="opacity:0.5">';
+          html += '<img class="meme-thumb" src="' + imgSrc + '" alt="" style="opacity:0.5"' + imgErr + '>';
         } else {
           html += '<div class="meme-thumb-placeholder" style="opacity:0.5">' + emoji + '</div>';
         }
@@ -1637,7 +1687,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
         const created = new Date(meme.created_at);
         const dateDisplay = (created.getMonth()+1) + '/' + created.getDate();
         const emoji = PLACEHOLDER_EMOJIS[Math.floor(Math.random() * PLACEHOLDER_EMOJIS.length)];
-        const imgSrc = meme.image_path && meme.image_path.startsWith('http') ? meme.image_path : '';
+        const imgSrc = resolveImg(meme.image_path);
 
         html += `<div class="meme-card" data-id="${meme.id}">
       <span class="card-number">#${globalIdx}</span>`;
@@ -1844,17 +1894,16 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   }
 
   .m-card .badge-row {
-    position: absolute; top: ${layout === 'list' ? 4 : 8}px; left: ${layout === 'list' ? 4 : 8}px; display: flex; gap: 4px; z-index: 2; flex-wrap: wrap;
+    display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
   }
   .m-card .cat-badge {
-    padding: 2px ${layout === 'list' ? 4 : 8}px; border-radius: 12px; font-size: ${layout === 'list' ? 11 : 16}px; font-weight: 700;
-    backdrop-filter: blur(8px); box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    padding: 2px ${layout === 'list' ? 4 : 8}px; border-radius: 12px; font-size: ${layout === 'list' ? 11 : 13}px; font-weight: 700;
   }
-  .m-card .cat-wz { background: rgba(99,102,241,0.9); color: white; }
-  .m-card .cat-pub { background: rgba(249,115,22,0.9); color: white; }
+  .m-card .cat-wz { background: rgba(99,102,241,0.12); color: #6366f1; }
+  .m-card .cat-pub { background: rgba(249,115,22,0.12); color: #ea580c; }
   .m-card .pri-badge {
-    padding: 2px ${layout === 'list' ? 4 : 8}px; border-radius: 12px; font-size: ${layout === 'list' ? 11 : 16}px; font-weight: 700;
-    backdrop-filter: blur(8px); box-shadow: 0 1px 4px rgba(0,0,0,0.12); color: white;
+    padding: 2px ${layout === 'list' ? 4 : 8}px; border-radius: 12px; font-size: ${layout === 'list' ? 11 : 13}px; font-weight: 700;
+    color: white;
   }
 
   .m-card .body { padding: ${layout === 'list' ? '8px 10px' : '14px 14px 12px'}; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
@@ -1866,7 +1915,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   .m-card .name a { color: #1d1d1f; text-decoration: none; }
   .m-card .summary {
     font-size: ${cardSummarySize}px; color: #6b7280; line-height: 1.5; margin-bottom: ${layout === 'list' ? 4 : 10}px;
-    display: -webkit-box; -webkit-line-clamp: ${n <= 4 ? 5 : n <= 8 ? 3 : layout === 'list' ? 1 : 2}; -webkit-box-orient: vertical; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: ${layout === 'list' ? 2 : 999}; -webkit-box-orient: vertical; overflow: hidden;
     flex: 1;
   }
 
@@ -1891,13 +1940,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   }
   .m-card .date { font-size: ${layout === 'list' ? 12 : 14}px; color: #9ca3af; }
 
-  /* ===== 尾部 ===== */
-  .m-footer {
-    width: 750px; padding: ${n <= 4 ? '40px 28px' : '24px 28px'}; text-align: center;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white;
-  }
-  .m-footer .logo { font-size: ${n <= 4 ? 36 : 24}px; margin-bottom: 6px; }
-  .m-footer .text { font-size: ${n <= 4 ? 20 : 16}px; opacity: 0.7; }
+
 
   /* 排版模式标注（调试用，正式截图不显示） */
   .m-layout-hint { display: none; }
@@ -1929,7 +1972,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       const created = new Date(meme.created_at);
       const dateDisplay = (created.getMonth()+1) + '/' + created.getDate();
       const emoji = PLACEHOLDER_EMOJIS[Math.floor(Math.random() * PLACEHOLDER_EMOJIS.length)];
-      const imgSrc = meme.image_path && meme.image_path.startsWith('http') ? meme.image_path : '';
+      const imgSrc = resolveImg(meme.image_path);
       const priColor = priorityColors[meme.priority] || '#9ca3af';
       const priLabel = priorityLabels[meme.priority] || '';
 
@@ -1937,7 +1980,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     <div class="top-bar"></div>
     <span class="card-idx">#${idx + 1}</span>`;
 
-      // 图片区 + badges
+      // badge HTML（放到 foot 区域显示）
       const badgeHTML = `<div class="badge-row">${
         meme.category === 'wangzhe'
           ? `<span class="cat-badge cat-wz">🎮 王者相关</span>`
@@ -1945,9 +1988,9 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       }${priLabel ? `<span class="pri-badge" style="background:${priColor}">${priLabel}</span>` : ''}</div>`;
 
       if (imgSrc) {
-        html += `<div class="img-wrap">${badgeHTML}<img src="${imgSrc}" loading="lazy" /></div>`;
+        html += `<div class="img-wrap"><img src="${imgSrc}" loading="lazy" /></div>`;
       } else {
-        html += `<div class="img-wrap">${badgeHTML}<div class="no-img">${emoji}</div></div>`;
+        html += `<div class="img-wrap"><div class="no-img">${emoji}</div></div>`;
       }
 
       html += `<div class="body">
@@ -1976,11 +2019,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       }
 
       html += `<div class="foot">`;
-      if (meme.source_url) {
-        html += `<a class="source" href="${escapeHtml(meme.source_url)}" target="_blank">🔗 原视频</a>`;
-      } else {
-        html += `<span></span>`;
-      }
+      html += badgeHTML;
       html += `<span class="date">${dateDisplay}</span>
       </div>
     </div>
@@ -1988,12 +2027,6 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     });
 
     html += `</div>
-
-<!-- 尾部 -->
-<div class="m-footer">
-  <div class="logo">🔥</div>
-  <div class="text">热梗洞察 · 用户社区组</div>
-</div>
 
 </div><!-- .m-root -->
 </body></html>`;
@@ -2051,8 +2084,8 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
       const isGray = pri === 'gray';
       const checked = !isGray;
       const catLabel = m.category === 'wangzhe' ? '🎮' : '🌐';
-      const imgThumb = m.image_path && m.image_path.startsWith('http')
-        ? '<img src="' + m.image_path + '" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0">'
+      const imgThumb = m.image_path
+        ? '<img src="' + thumbImg(m.image_path) + '" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0"' + imgFallback(m.image_path) + '>'
         : '<div style="width:36px;height:36px;border-radius:6px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🔥</div>';
       html += '<label class="meme-pick-item" data-priority="' + pri + '" data-id="' + m.id + '" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background 0.15s' + (isGray ? ';opacity:0.5' : '') + '">';
       html += '<input type="checkbox"' + (checked ? ' checked' : '') + ' style="width:18px;height:18px;accent-color:#6366f1;flex-shrink:0" onchange="onMemeCheckChange(this,\'' + m.id + '\')">';
@@ -2361,10 +2394,10 @@ window.addEventListener('load', function() {
         if (m.source_url) line += '  [视频](' + m.source_url + ')';
         if (m.summary) line += '\n   > ' + m.summary;
         if (m.official_title || m.official_link) {
-          line += '\n   > 官号跟进：' + (m.official_title || '') + (m.official_link ? '  [查看](' + m.official_link + ')' : '');
+          line += '\n   > 📌【官号跟进】' + (m.official_title || '') + (m.official_link ? '  [查看](' + m.official_link + ')' : '');
         }
         if (m.incentive_topic || m.incentive_link) {
-          line += '\n   > 作者激励：' + (m.incentive_topic || '') + (m.incentive_link ? '  [查看](' + m.incentive_link + ')' : '');
+          line += '\n   > 🎁【作者激励】' + (m.incentive_topic || '') + (m.incentive_link ? '  [查看](' + m.incentive_link + ')' : '');
         }
         mdLines.push(line);
       });

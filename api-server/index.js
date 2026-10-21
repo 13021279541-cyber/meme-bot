@@ -12,7 +12,7 @@ const crypto = require('crypto');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
-const API_VERSION = '2026-03-30-v3'; // 用于前端校验后端代码是否已更新
+const API_VERSION = '2026-10-21-local-storage'; // 用于前端校验后端代码是否已更新
 
 const app = express();
 
@@ -472,6 +472,56 @@ const upload = multer({
     }
   }),
   limits: { fileSize: 20 * 1024 * 1024 }
+});
+
+// ===== 本地图片存储（替代 Supabase Storage，2026-10-21）=====
+// 梗截图统一存 CVM 本地磁盘，由 express.static 托管，零流量成本
+const memeUploadDir = path.join(__dirname, "public", "uploads");
+if (!fs.existsSync(memeUploadDir)) fs.mkdirSync(memeUploadDir, { recursive: true });
+
+const memeUpload = multer({
+  storage: multer.diskStorage({
+    destination: memeUploadDir,
+    filename: (req, file, cb) => {
+      // thumb 字段加 _thumb 后缀，与主图同名以便前端按约定推导
+      const base = req.__memeBaseName || (req.__memeBaseName = "meme_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8));
+      const ext = (path.extname(file.originalname) || ".jpg").toLowerCase();
+      cb(null, file.fieldname === "thumb" ? base + "_thumb" + ext : base + ext);
+    }
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 }
+});
+
+// POST /upload-image - 前端表单上传截图（multipart: image 必填, thumb 选填）
+app.post("/upload-image", memeUpload.fields([{ name: "image", maxCount: 1 }, { name: "thumb", maxCount: 1 }]), (req, res) => {
+  try {
+    const main = req.files && req.files.image && req.files.image[0];
+    if (!main) return res.status(400).json({ ok: false, error: "没有收到图片" });
+    const url = "/uploads/" + main.filename;
+    const thumbFile = req.files.thumb && req.files.thumb[0];
+    console.log("[upload-image] 已保存:", url, thumbFile ? "(含缩略图)" : "");
+    res.json({ ok: true, url, thumb: thumbFile ? "/uploads/" + thumbFile.filename : null });
+  } catch (e) {
+    console.error("[upload-image] 错误:", e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// POST /upload-image-base64 - 供 aibot-client 群聊录入转存图片使用
+app.post("/upload-image-base64", (req, res) => {
+  try {
+    const { base64, ext } = req.body || {};
+    if (!base64) return res.status(400).json({ ok: false, error: "base64 不能为空" });
+    const safeExt = (ext || "png").replace(/[^a-z0-9]/gi, "").slice(0, 5) || "png";
+    const filename = "meme_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "." + safeExt;
+    fs.writeFileSync(path.join(memeUploadDir, filename), Buffer.from(base64, "base64"));
+    const url = "/uploads/" + filename;
+    console.log("[upload-image-base64] 已保存:", url);
+    res.json({ ok: true, url });
+  } catch (e) {
+    console.error("[upload-image-base64] 错误:", e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 app.post("/push-image", upload.single("image"), async (req, res) => {

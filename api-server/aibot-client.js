@@ -637,13 +637,13 @@ function replyToChat(chatid, chatType, content, botId) {
   }
 }
 
-// 将企微图片 URL 转存到 Supabase Storage
-function uploadImageToSupabase(imageUrl) {
+// 将企微图片 URL 转存到 CVM 本地存储（2026-10-21 从 Supabase 迁移）
+function uploadImageToLocal(imageUrl) {
   return new Promise((resolve) => {
     const protocol = imageUrl.startsWith('https') ? https : http;
     protocol.get(imageUrl, { headers: { 'User-Agent': 'MemeBot/1.0' } }, (res) => {
       if (res.statusCode === 301 || res.statusCode === 302) {
-        return uploadImageToSupabase(res.headers.location).then(resolve);
+        return uploadImageToLocal(res.headers.location).then(resolve);
       }
       if (res.statusCode !== 200) {
         log('WARN', `[meme-input] 图片下载失败: HTTP ${res.statusCode}`);
@@ -656,46 +656,38 @@ function uploadImageToSupabase(imageUrl) {
         const buffer = Buffer.concat(chunks);
         const contentType = res.headers['content-type'] || 'image/png';
         const ext = contentType.includes('jpeg') || contentType.includes('jpg') ? 'jpg' : 'png';
-        const filename = `meme_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-        const supabaseUrl = process.env.SUPABASE_URL || 'https://iwmvtizwcibusjjiquwq.supabase.co';
-        const supabaseKey = process.env.SUPABASE_ANON_KEY || '';
-        if (!supabaseKey) {
-          log('WARN', '[meme-input] 未配置 SUPABASE_ANON_KEY，跳过图片上传');
-          resolve(null);
-          return;
-        }
-
-        const uploadPath = `/storage/v1/object/meme-images/${filename}`;
-        const uploadUrlObj = new URL(uploadPath, supabaseUrl);
-        const uploadReq = https.request({
-          hostname: uploadUrlObj.hostname,
-          path: uploadUrlObj.pathname,
+        // 交给 api-server 落盘，避免两个进程各自维护存储路径
+        const payload = JSON.stringify({ base64: buffer.toString('base64'), ext });
+        const apiPort = process.env.API_PORT || 3000;
+        const req = http.request({
+          hostname: '127.0.0.1',
+          port: apiPort,
+          path: '/upload-image-base64',
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
-            'apikey': supabaseKey,
-            'Content-Type': contentType,
-            'Content-Length': buffer.length,
-            'x-upsert': 'true'
-          }
-        }, (uploadRes) => {
+          headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+        }, (apiRes) => {
           let data = '';
-          uploadRes.on('data', chunk => data += chunk);
-          uploadRes.on('end', () => {
-            if (uploadRes.statusCode === 200 || uploadRes.statusCode === 201) {
-              const publicUrl = `${supabaseUrl}/storage/v1/object/public/meme-images/${filename}`;
-              log('INFO', `[meme-input] 图片上传成功: ${publicUrl}`);
-              resolve(publicUrl);
-            } else {
-              log('ERROR', `[meme-input] Supabase 上传失败: ${uploadRes.statusCode} ${data}`);
+          apiRes.on('data', chunk => data += chunk);
+          apiRes.on('end', () => {
+            try {
+              const result = JSON.parse(data);
+              if (result.ok && result.url) {
+                log('INFO', `[meme-input] 图片已存本地: ${result.url}`);
+                resolve(result.url);
+              } else {
+                log('ERROR', `[meme-input] 本地存储失败: ${data}`);
+                resolve(null);
+              }
+            } catch (e) {
+              log('ERROR', `[meme-input] 本地存储响应解析失败: ${data}`);
               resolve(null);
             }
           });
         });
-        uploadReq.on('error', (e) => { log('ERROR', `[meme-input] 上传出错: ${e.message}`); resolve(null); });
-        uploadReq.write(buffer);
-        uploadReq.end();
+        req.on('error', (e) => { log('ERROR', `[meme-input] 上传出错: ${e.message}`); resolve(null); });
+        req.write(payload);
+        req.end();
       });
     }).on('error', (e) => { log('ERROR', `[meme-input] 图片下载出错: ${e.message}`); resolve(null); });
   });
@@ -768,7 +760,7 @@ async function handleMemeInput(body, botId) {
   if (recentImages[cacheKey]) {
     const cached = recentImages[cacheKey];
     if (cached.url) {
-      imageUrl = await uploadImageToSupabase(cached.url);
+      imageUrl = await uploadImageToLocal(cached.url);
     }
     delete recentImages[cacheKey];
   }

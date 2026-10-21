@@ -8,3 +8,9 @@ images/
 data/
 venv/
 .venv/
+
+# 用户上传的梗截图与周报截图：只存在于 CVM 本地磁盘，不进仓库
+api-server/public/uploads/
+api-server/public/screenshots/
+api-server/migrate-images-failed.json
+node_modules/
