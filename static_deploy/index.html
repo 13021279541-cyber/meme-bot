@@ -184,8 +184,13 @@
     border-radius: 12px;
     font-size: 15px;
     font-weight: 600;
+    max-width: min(90vw, 560px);
+    text-align: center;
+    line-height: 1.5;
     color: white;
-    z-index: 999;
+    /* 必须高于推送群选择弹窗(9998)、灯箱(9999)及其关闭按钮(10000)，
+       否则提示会被遮罩的半透明+模糊滤镜糊住，看不清报错内容 */
+    z-index: 10002;
     opacity: 0;
     pointer-events: none;
     transition: all 0.3s;
@@ -935,7 +940,9 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.className = 'toast ' + type + ' show';
-    setTimeout(() => t.classList.remove('show'), 2500);
+    clearTimeout(showToast._timer);
+    // 报错信息通常较长，给足阅读时间；普通提示保持轻快
+    showToast._timer = setTimeout(() => t.classList.remove('show'), type === 'error' ? 6000 : 2500);
   }
   window.showToast = showToast;
 
@@ -2374,12 +2381,16 @@ window.addEventListener('load', function() {
 
     try {
       // ===== 校验后端版本（防止 CVM 代码未更新导致截图/推送错误）=====
-      const REQUIRED_API_VERSION = '2026-03-30-v3';
+      // 按版本号的日期前缀比较：后端只要不早于该日期即放行。
+      // 不用全等判断，否则每次后端升版都得手动同步这里，漏改就会误拦推送。
+      const REQUIRED_API_DATE = '2026-10-21';
       try {
-        const verRes = await fetch('/version');
+        const verRes = await fetch((API_BASE || '') + '/version');
         const verData = await verRes.json();
-        if (verData.version !== REQUIRED_API_VERSION) {
-          showToast('⚠️ 服务端代码版本不匹配（当前: ' + (verData.version || '未知') + '，需要: ' + REQUIRED_API_VERSION + '），请联系运维部署最新代码', 'error');
+        const curVer = verData.version || '';
+        const curDate = curVer.slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(curDate) || curDate < REQUIRED_API_DATE) {
+          showToast('⚠️ 服务端代码过旧（当前: ' + (curVer || '未知') + '，需要 ' + REQUIRED_API_DATE + ' 或更新版本），请联系运维部署最新代码', 'error');
           return;
         }
       } catch (verErr) {
